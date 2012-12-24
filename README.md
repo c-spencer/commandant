@@ -59,7 +59,7 @@ var Command = {
 
 ```
 
-## Transitive Commands
+## Transient Commands
 
 Some commands may need updating after their initialisation, but before they are
 recorded into the action chain. An example of this might be adding a new element
@@ -83,7 +83,7 @@ new_element_action.update(50, 80);
 // result of the 'run' function just after initialisation.
 new_element = new_element_action.finish();
 
-// Can use the same command in a non-transitive manner.
+// Can use the same command in a non-transient manner.
 new_element_2 = keen.execute('CREATE_ELEMENT', 'circle', 100, 100);
 ```
 
