@@ -95,11 +95,14 @@ Commandant.compound() for accessing it.
 
 ```
 var compound = keen.compound();
-compound.execute('CREATE_ELEMENT', 'circle', 100, 100);
-compound.execute('CREATE_ELEMENT', 'circle', 100, 100);
-compound.execute('CREATE_ELEMENT', 'circle', 100, 100);
+compound.update('CREATE_ELEMENT', 'circle', 100, 100);
+compound.update('CREATE_ELEMENT', 'circle', 100, 100);
+compound.update('CREATE_ELEMENT', 'circle', 100, 100);
 compound.finish();
 ```
+
+Compounds are very likely to change in future, the current implementation is
+mostly just to see how well they could be implemented as a Command.
 
 ## Bound Commandants
 
