@@ -159,3 +159,7 @@ These are put in place to avoid, and make obvious, possible concurrency issues.
 - Action Aggregation (e.g. automatic merging of several actions into one)
 - Asynchronous Commands (based on promises)
 - Action stack synchronisation and broadcast (for basic document collaboration)
+
+## License
+
+MIT License
