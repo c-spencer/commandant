@@ -1,0 +1,23 @@
+{
+  "name": "commandant",
+  "description": "JavaScript undo/redo management.",
+  "author": {
+    "name": "Chris Spencer",
+    "email": "chris@sysdea.com",
+    "url": "http://chris-spencer.co.uk"
+  },
+
+  "version": "0.1.0",
+
+  "main": "./commandant.js",
+
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:strategydynamics/commandant.git"
+  },
+
+  "devDependencies": {
+    "grunt": "0.3.x",
+    "grunt-coffee": "0.0.6"
+  }
+}
