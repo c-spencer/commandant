@@ -93,17 +93,33 @@
         this.stack_idx = 0;
       }
       this.stack = [];
+      if (typeof this.trigger === "function") {
+        this.trigger('reset', rollback);
+      }
+      if (typeof this.onReset === "function") {
+        this.onReset(rollback);
+      }
     };
 
     Commandant.prototype.register = function(name, command) {
       this.commands[name] = command;
+      if (typeof this.trigger === "function") {
+        this.trigger('register_command', name, command);
+      }
+      if (typeof this.onRegisterCommand === "function") {
+        this.onRegisterCommand(name, command);
+      }
     };
 
     Commandant.prototype.silent = function(fn) {
       var result;
-      this._silent = true;
-      result = fn();
-      this._silent = false;
+      if (this._silent) {
+        result = fn();
+      } else {
+        this._silent = true;
+        result = fn();
+        this._silent = false;
+      }
       return result;
     };
 
@@ -145,21 +161,37 @@
     };
 
     Commandant.prototype.redo = function() {
+      var action;
       if (this.stack_idx === this.stack.length) {
         return;
       }
       this._assert(!this._transient, 'Cannot redo while transient action active.');
-      this._run(this.stack[this.stack_idx], 'run');
+      action = this.stack[this.stack_idx];
+      this._run(action, 'run');
       ++this.stack_idx;
+      if (typeof this.trigger === "function") {
+        this.trigger('redo', action);
+      }
+      if (typeof this.onRedo === "function") {
+        this.onRedo(action);
+      }
     };
 
     Commandant.prototype.undo = function() {
+      var action;
       if (this.stack_idx === 0) {
         return;
       }
       this._assert(!this._transient, 'Cannot undo while transient action active.');
       --this.stack_idx;
-      this._run(this.stack[this.stack_idx], 'undo');
+      action = this.stack[this.stack_idx];
+      this._run(action, 'undo');
+      if (typeof this.trigger === "function") {
+        this.trigger('undo', action);
+      }
+      if (typeof this.onUndo === "function") {
+        this.onUndo(action);
+      }
     };
 
     Commandant.prototype.transient = function() {
@@ -211,6 +243,12 @@
       this.stack.splice(this.stack_idx, Infinity);
       this.stack.push(action);
       this.stack_idx = this.stack.length;
+      if (typeof this.trigger === "function") {
+        this.trigger("execute", action);
+      }
+      if (typeof this.onExecute === "function") {
+        this.onExecute(action);
+      }
     };
 
     Commandant.prototype._assert = function(val, message) {
