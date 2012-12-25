@@ -55,11 +55,19 @@ class Commandant
     else
       @stack_idx = 0
     @stack = []
+
+    @trigger?('reset', rollback)
+    @onReset?(rollback)
+
     return
 
   # Register a new named command to be available for execution.
   register: (name, command) ->
     @commands[name] = command
+
+    @trigger?('register_command', name, command)
+    @onRegisterCommand?(name, command)
+
     return
 
   # Execute a function without recording any command executions.
@@ -104,8 +112,12 @@ class Commandant
 
     @_assert(!@_transient, 'Cannot redo while transient action active.')
 
-    @_run(@stack[@stack_idx], 'run')
+    action = @stack[@stack_idx]
+    @_run(action, 'run')
     ++@stack_idx
+
+    @trigger?('redo', action)
+    @onRedo?(action)
 
     return
 
@@ -116,7 +128,11 @@ class Commandant
     @_assert(!@_transient, 'Cannot undo while transient action active.')
 
     --@stack_idx
-    @_run(@stack[@stack_idx], 'undo')
+    action = @stack[@stack_idx]
+    @_run(action, 'undo')
+
+    @trigger?('undo', action)
+    @onUndo?(action)
 
     return
 
@@ -170,6 +186,10 @@ class Commandant
     @stack.splice(@stack_idx, Infinity)
     @stack.push action
     @stack_idx = @stack.length
+
+    @trigger?("execute", action)
+    @onExecute?(action)
+
     return
 
   _assert: (val, message) ->
