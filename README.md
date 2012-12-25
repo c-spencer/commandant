@@ -93,7 +93,7 @@ Compound actions are groups of actions that are run and undone in a single step.
 They are implemented as a default command '__compound', with a helper function
 Commandant.compound() for accessing it.
 
-```
+``` javascript
 var compound = keen.compound();
 compound.update('CREATE_ELEMENT', 'circle', 100, 100);
 compound.update('CREATE_ELEMENT', 'circle', 100, 100);
@@ -120,11 +120,55 @@ To help with this, you can create a bound proxy to a Commandant, that has some
 of its arguments pre-filled. (Only `execute` and `transient` are available on
 this proxy.)
 
-```
+``` javascript
 var element_5_commandant = keen.bind(element_5);
 element_5_commandant.execute('MOVE_ELEMENT', 60, 80);
 element_5_commandant.execute('MOVE_ELEMENT', 400, 100);
 etc.
+```
+
+## Events and Hooks
+
+Commandant supports a number of hook functions and event triggers, but does not
+itself bundle an Events library. To take advantage of events, simply mix in your
+favourite library to the Commandant prototype. For example, with Backbone:
+
+``` javascript
+_.extend(Commandant.prototype, Backbone.Events);
+```
+
+Supported events/hooks:
+
+```
+onReset(rollback) / 'reset':
+Triggered when the Commandant is reset.
+
+onRegisterCommand(name, command) / 'register_command':
+Triggered when a new command is registered.
+
+onRedo(action) / 'redo':
+Triggered when an action is redone.
+
+onUndo(action) / 'undo':
+Triggered when an action is undone.
+
+onExecute(action) / 'execute':
+Triggered when a command is executed, or a transient completes.
+```
+
+## Additional API
+
+```
+Commandant.reset(rollback)
+Resets the actions in the Commandant. Rollback determines whether the actions in
+the stack are undone, or simply cleared. Defaults to true.
+
+Commandant.stackStats() : { length, position }
+Returns an object detailing the length and position within the current action
+stack.
+
+Commandant.silent(fn)
+Runs the given function with no recording of new actions (but still executing).
 ```
 
 ## Command Implementation Considerations
