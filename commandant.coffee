@@ -72,9 +72,12 @@ class Commandant
 
   # Execute a function without recording any command executions.
   silent: (fn) ->
-    @_silent = true
-    result = fn()
-    @_silent = false
+    if @_silent
+      result = fn()
+    else
+      @_silent = true
+      result = fn()
+      @_silent = false
 
     return result
 
