@@ -229,21 +229,30 @@
       };
     };
 
+    Commandant.prototype._agg = function(action) {
+      var agg, prev_action, _base;
+      if (prev_action = this.getUndoAction()) {
+        if (agg = typeof (_base = this.commands[prev_action.name]).aggregate === "function" ? _base.aggregate(prev_action, action) : void 0) {
+          prev_action.name = agg.name;
+          prev_action.data = agg.data;
+          return prev_action;
+        }
+      }
+    };
+
     Commandant.prototype.execute = function() {
-      var args, command, data, name, result;
+      var action, args, command, data, name, result;
       name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       this._assert(!this._transient, 'Cannot execute while transient action active.');
       command = this.commands[name];
       data = command.init.apply(command, [this.scope].concat(__slice.call(args)));
-      result = this._run({
+      action = {
         name: name,
         data: data
-      }, 'run');
-      if (!this._silent) {
-        this._push({
-          name: name,
-          data: data
-        });
+      };
+      result = this._run(action, 'run');
+      if (this._silent || !this._agg(action)) {
+        this._push(action);
       }
       return result;
     };
@@ -294,15 +303,19 @@
         update: function() {
           var args;
           args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-          command.update.apply(command, [_this._scope(command, data), data].concat(__slice.call(args)));
+          data = command.update.apply(command, [_this._scope(command, data), data].concat(__slice.call(args)));
         },
         finish: function() {
-          _this._push({
-            name: name,
-            data: data
-          });
+          var action;
           _this._transient = false;
           _this._silent = false;
+          action = {
+            name: name,
+            data: data
+          };
+          if (!_this._agg(action)) {
+            _this._push(action);
+          }
           return ret_val;
         },
         cancel: function() {

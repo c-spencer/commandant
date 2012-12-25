@@ -151,6 +151,15 @@ class Commandant
         @transient.apply(@, [name, scoped_args..., args...])
     }
 
+  # Try and aggregate an action given the current state.
+  _agg: (action) ->
+    if prev_action = @getUndoAction()
+      if agg = @commands[prev_action.name].aggregate?(prev_action, action)
+        prev_action.name = agg.name
+        prev_action.data = agg.data
+        return prev_action
+    return
+
   # Execute a new command, with name and data.
   # Commands executed will be recorded and can execute other commands, but they
   # will not themselves be recorded.
@@ -163,9 +172,12 @@ class Commandant
     command = @commands[name]
     data = command.init.apply(command, [@scope, args...])
 
-    result = @_run({ name, data }, 'run')
+    action = { name, data }
 
-    @_push({ name, data }) unless @_silent
+    result = @_run(action, 'run')
+
+    if @_silent or !@_agg(action)
+      @_push(action)
 
     return result
 
@@ -217,12 +229,16 @@ class Commandant
 
     return {
       update: (args...) =>
-        command.update.apply(command, [@_scope(command, data), data, args...])
+        data = command.update.apply(command, [@_scope(command, data), data, args...])
         return
       finish: =>
-        @_push({ name, data })
         @_transient = false
         @_silent = false
+
+        action = { name, data }
+        if !@_agg(action)
+          @_push(action)
+
         return ret_val
       cancel: =>
         command.undo(scope, data)

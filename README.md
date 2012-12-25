@@ -48,12 +48,23 @@ var Command = {
   // Runs a command backwards.
   undo: function (scope, data) { },
 
-  // OPTIONAL: Allows command to be used transiently (covered later)
+  // OPTIONAL: Allows command to be used transiently.
+  // Should return the new data for the action. Does not implicitly call run(), so
+  // side effects should be done explicitly. ('this' will be the command, so you can
+  // reuse the run logic if needed using 'this.run(scope, data)')
+  // *Can* modify in place and return the data, rather than a new object.
   update: function (scope, data, arg1, arg2, ...) { },
 
   // OPTIONAL: Allows a command to transform the scope seen by run, undo, update
   scope: function (scope, data) {
     return new_scope;
+  },
+
+  // OPTIONAL: Allows a command to aggregate itself, given a previous and new action.
+  // prev and next are of form { name, data }, and aggregate should return the same form
+  // or undefined if no aggregation.
+  aggregate: function (prev, next) {
+    return { name, data };
   }
 }
 
