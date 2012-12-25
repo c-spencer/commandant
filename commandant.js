@@ -1,6 +1,62 @@
 (function() {
-  var Commandant,
+  var Commandant, StackStore,
     __slice = [].slice;
+
+  StackStore = (function() {
+
+    function StackStore() {
+      this.reset();
+    }
+
+    StackStore.prototype.record = function(action) {
+      this.stack.splice(this.idx, Infinity);
+      this.stack.push(action);
+      return this.idx = this.stack.length;
+    };
+
+    StackStore.prototype.getRedoActions = function() {
+      var actions;
+      if (this.idx === this.stack.length) {
+        actions = [];
+      } else {
+        actions = [this.stack[this.idx]];
+      }
+      return actions;
+    };
+
+    StackStore.prototype.redo = function(action) {
+      return ++this.idx;
+    };
+
+    StackStore.prototype.undo = function(action) {
+      return --this.idx;
+    };
+
+    StackStore.prototype.reset = function() {
+      this.stack = [];
+      return this.idx = 0;
+    };
+
+    StackStore.prototype.getUndoAction = function() {
+      var action;
+      if (this.idx === 0) {
+        action = null;
+      } else {
+        action = this.stack[this.idx - 1];
+      }
+      return action;
+    };
+
+    StackStore.prototype.stats = function() {
+      return {
+        length: this.stack.length,
+        position: this.idx
+      };
+    };
+
+    return StackStore;
+
+  })();
 
   Commandant = (function() {
 
@@ -48,10 +104,7 @@
       this.opts = {
         pedantic: opts.pedantic != null ? opts.pedantic : true
       };
-      this.stack = [];
-      this.stack_idx = 0;
-      this._silent = false;
-      this._transient = false;
+      this.store = new StackStore;
     }
 
     Commandant.define = function(commands) {
@@ -74,11 +127,48 @@
       return fn;
     };
 
-    Commandant.prototype.stackStats = function() {
-      return {
-        length: this.stack.length,
-        position: this.stack_idx
-      };
+    Commandant.prototype.storeStats = function() {
+      return this.store.stats();
+    };
+
+    Commandant.prototype._push = function(action) {
+      this.store.record(action);
+      if (typeof this.trigger === "function") {
+        this.trigger("execute", action);
+      }
+      if (typeof this.onExecute === "function") {
+        this.onExecute(action);
+      }
+    };
+
+    Commandant.prototype.getRedoActions = function(proceed) {
+      var action, actions;
+      if (proceed == null) {
+        proceed = false;
+      }
+      actions = this.store.getRedoActions();
+      if (proceed) {
+        action = actions[0];
+        if (!action) {
+          return null;
+        }
+        this.store.redo(action);
+        return action;
+      } else {
+        return actions;
+      }
+    };
+
+    Commandant.prototype.getUndoAction = function(proceed) {
+      var action;
+      if (proceed == null) {
+        proceed = false;
+      }
+      action = this.store.getUndoAction();
+      if (proceed && action) {
+        this.store.undo(action);
+      }
+      return action;
     };
 
     Commandant.prototype.reset = function(rollback) {
@@ -86,13 +176,11 @@
         rollback = true;
       }
       if (rollback) {
-        while (this.stack_idx) {
+        while (this.getUndoAction()) {
           this.undo();
         }
-      } else {
-        this.stack_idx = 0;
       }
-      this.stack = [];
+      this.store.reset();
       if (typeof this.trigger === "function") {
         this.trigger('reset', rollback);
       }
@@ -162,13 +250,12 @@
 
     Commandant.prototype.redo = function() {
       var action;
-      if (this.stack_idx === this.stack.length) {
+      this._assert(!this._transient, 'Cannot redo while transient action active.');
+      action = this.getRedoActions(true);
+      if (!action) {
         return;
       }
-      this._assert(!this._transient, 'Cannot redo while transient action active.');
-      action = this.stack[this.stack_idx];
       this._run(action, 'run');
-      ++this.stack_idx;
       if (typeof this.trigger === "function") {
         this.trigger('redo', action);
       }
@@ -179,12 +266,11 @@
 
     Commandant.prototype.undo = function() {
       var action;
-      if (this.stack_idx === 0) {
+      this._assert(!this._transient, 'Cannot undo while transient action active.');
+      action = this.getUndoAction(true);
+      if (!action) {
         return;
       }
-      this._assert(!this._transient, 'Cannot undo while transient action active.');
-      --this.stack_idx;
-      action = this.stack[this.stack_idx];
       this._run(action, 'undo');
       if (typeof this.trigger === "function") {
         this.trigger('undo', action);
@@ -236,18 +322,6 @@
         return command.scope(this.scope, data);
       } else {
         return this.scope;
-      }
-    };
-
-    Commandant.prototype._push = function(action) {
-      this.stack.splice(this.stack_idx, Infinity);
-      this.stack.push(action);
-      this.stack_idx = this.stack.length;
-      if (typeof this.trigger === "function") {
-        this.trigger("execute", action);
-      }
-      if (typeof this.onExecute === "function") {
-        this.onExecute(action);
       }
     };
 

@@ -64,27 +64,27 @@ exports['Basic Commandant'] = {
 
     keen.undo();
     test.deepEqual(counters, { init: 2, run: 2, undo: 2, scope: 5, update: 1 });
-    test.deepEqual(keen.stackStats(), { length: 2, position: 0 });
+    test.deepEqual(keen.storeStats(), { length: 2, position: 0 });
 
     keen.undo();
     test.deepEqual(counters, { init: 2, run: 2, undo: 2, scope: 5, update: 1 });
-    test.deepEqual(keen.stackStats(), { length: 2, position: 0 });
+    test.deepEqual(keen.storeStats(), { length: 2, position: 0 });
 
     keen.redo();
     test.deepEqual(counters, { init: 2, run: 3, undo: 2, scope: 6, update: 1 });
 
     keen.redo();
     test.deepEqual(counters, { init: 2, run: 4, undo: 2, scope: 7, update: 1 });
-    test.deepEqual(keen.stackStats(), { length: 2, position: 2 });
+    test.deepEqual(keen.storeStats(), { length: 2, position: 2 });
 
     keen.redo();
     test.deepEqual(counters, { init: 2, run: 4, undo: 2, scope: 7, update: 1 });
-    test.deepEqual(keen.stackStats(), { length: 2, position: 2 });
+    test.deepEqual(keen.storeStats(), { length: 2, position: 2 });
 
     keen.reset();
     test.deepEqual(counters, { init: 2, run: 4, undo: 4, scope: 9, update: 1 });
 
-    test.deepEqual(keen.stackStats(), { length: 0, position: 0 });
+    test.deepEqual(keen.storeStats(), { length: 0, position: 0 });
 
     test.done();
   }

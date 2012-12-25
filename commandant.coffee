@@ -1,5 +1,46 @@
-class Commandant
+class StackStore
+  constructor: ->
+    @reset()
 
+  record: (action) ->
+    @stack.splice(@idx, Infinity)
+    @stack.push action
+    @idx = @stack.length
+
+  getRedoActions: ->
+    if @idx == @stack.length
+      actions = []
+    else
+      actions = [@stack[@idx]]
+
+    actions
+
+  redo: (action) ->
+    ++@idx
+
+  undo: (action) ->
+    --@idx
+
+  reset: ->
+    @stack = []
+    @idx = 0
+
+  getUndoAction: ->
+    if @idx == 0
+      action = null
+    else
+      action = @stack[@idx - 1]
+
+    action
+
+  stats: ->
+    {
+      length: @stack.length,
+      position: @idx
+    }
+
+
+class Commandant
   constructor: (@scope, opts = {}) ->
     @commands = {
       __compound:
@@ -22,10 +63,7 @@ class Commandant
     # Can generalise this when more options added.
     @opts = { pedantic: if opts.pedantic? then opts.pedantic else true }
 
-    @stack = []
-    @stack_idx = 0
-    @_silent = false
-    @_transient = false
+    @store = new StackStore
 
   # Allow creation of new Commandants with predefined commands.
   @define: (commands={}) ->
@@ -40,21 +78,43 @@ class Commandant
 
     fn
 
-  # Expose some information on the stack.
-  stackStats: ->
-    {
-      length: @stack.length,
-      position: @stack_idx
-    }
+  # Expose some information on the action store.
+  storeStats: ->
+    @store.stats()
+
+  # Push an action
+  _push: (action) ->
+    @store.record(action)
+    @trigger?("execute", action)
+    @onExecute?(action)
+
+    return
+
+  # Get the actions that redo could call.
+  # If proceed is set, only return first one and advance the store.
+  getRedoActions: (proceed = false) ->
+    actions = @store.getRedoActions()
+    if proceed
+      action = actions[0]
+      if !action
+        return null
+      @store.redo(action)
+      return action
+    else
+      return actions
+
+  # Get the action that undo could call, and rollback the store if proceed is true.
+  getUndoAction: (proceed = false) ->
+    action = @store.getUndoAction()
+    @store.undo(action) if proceed and action
+    action
 
   # Reset the Commandant.
-  # By default it will unwind the actions on the stack.
+  # By default it will unwind the actions.
   reset: (rollback=true) ->
     if rollback
-      @undo() while @stack_idx
-    else
-      @stack_idx = 0
-    @stack = []
+      @undo() while @getUndoAction()
+    @store.reset()
 
     @trigger?('reset', rollback)
     @onReset?(rollback)
@@ -111,13 +171,11 @@ class Commandant
 
   # Run the Commandant redos one step. Does nothing if at end of chain.
   redo: ->
-    return if @stack_idx == @stack.length
-
     @_assert(!@_transient, 'Cannot redo while transient action active.')
 
-    action = @stack[@stack_idx]
+    action = @getRedoActions(true)
+    return unless action
     @_run(action, 'run')
-    ++@stack_idx
 
     @trigger?('redo', action)
     @onRedo?(action)
@@ -126,12 +184,10 @@ class Commandant
 
   # Run the Commandant undos one step. Does nothing if at start of chain.
   undo: ->
-    return if @stack_idx == 0
-
     @_assert(!@_transient, 'Cannot undo while transient action active.')
 
-    --@stack_idx
-    action = @stack[@stack_idx]
+    action = @getUndoAction(true)
+    return unless action
     @_run(action, 'undo')
 
     @trigger?('undo', action)
@@ -183,17 +239,6 @@ class Commandant
   # Resolve a commands scope.
   _scope: (command, data) ->
     if command.scope then command.scope(@scope, data) else @scope
-
-  # Push an action onto the stack
-  _push: (action) ->
-    @stack.splice(@stack_idx, Infinity)
-    @stack.push action
-    @stack_idx = @stack.length
-
-    @trigger?("execute", action)
-    @onExecute?(action)
-
-    return
 
   _assert: (val, message) ->
     if @opts.pedantic and !val

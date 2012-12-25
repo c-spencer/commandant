@@ -163,7 +163,7 @@ Commandant.reset(rollback)
 Resets the actions in the Commandant. Rollback determines whether the actions in
 the stack are undone, or simply cleared. Defaults to true.
 
-Commandant.stackStats() : { length, position }
+Commandant.storeStats() : { length, position }
 Returns an object detailing the length and position within the current action
 stack.
 
