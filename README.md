@@ -238,6 +238,24 @@ place, unless you turn off pedantic mode. (`new Commandant(o, {pedantic: false}`
 
 These are put in place to avoid, and make obvious, possible concurrency issues.
 
+## Filesize
+
+Example filesizes, not guaranteed to be completely current.
+
+```
+File "./builds/commandant.noasync.min.js" created.
+Uncompressed size: 11384 bytes.
+Compressed size: 1623 bytes gzipped (6362 bytes minified).
+
+File "./builds/commandant.min.js" created.
+Uncompressed size: 19177 bytes.
+Compressed size: 2491 bytes gzipped (10671 bytes minified).
+
+File "./builds/commandant.q.min.js" created.
+Uncompressed size: 68099 bytes.
+Compressed size: 5994 bytes gzipped (21677 bytes minified).
+```
+
 ## Further Work
 
 - More examples, particularly an interactive one.
