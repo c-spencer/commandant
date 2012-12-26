@@ -1644,35 +1644,18 @@ var qEndingLine = captureLine();
       }
       this.commands = {
         __compound: {
-          init: function() {
-            return [];
-          },
           run: function(scope, data) {
             var action, _i, _len;
             for (_i = 0, _len = data.length; _i < _len; _i++) {
               action = data[_i];
-              _this.commands[action.name].run(scope, action.data);
+              _this._run(action, 'run');
             }
-          },
-          update: function() {
-            var args, command, data, name, prev_data, scope;
-            scope = arguments[0], prev_data = arguments[1], name = arguments[2], args = 4 <= arguments.length ? __slice.call(arguments, 3) : [];
-            command = _this.commands[name];
-            data = command.init.apply(command, [_this.scope].concat(__slice.call(args)));
-            prev_data.push({
-              name: name,
-              data: data
-            });
-            return _this._run({
-              name: name,
-              data: data
-            }, 'run');
           },
           undo: function(scope, data) {
             var action, _i, _len;
             for (_i = 0, _len = data.length; _i < _len; _i++) {
               action = data[_i];
-              _this.commands[action.name].undo(scope, action.data);
+              _this._run(action, 'undo');
             }
           }
         }
@@ -1681,6 +1664,7 @@ var qEndingLine = captureLine();
         pedantic: opts.pedantic != null ? opts.pedantic : true
       };
       this.store = new StackStore;
+      this._compound = null;
     }
 
     Commandant.define = function(commands) {
@@ -1708,12 +1692,16 @@ var qEndingLine = captureLine();
     };
 
     Commandant.prototype._push = function(action) {
-      this.store.record(action);
-      if (typeof this.trigger === "function") {
-        this.trigger("execute", action);
-      }
-      if (typeof this.onExecute === "function") {
-        this.onExecute(action);
+      if (this._compound) {
+        this._compound.push(action);
+      } else {
+        this.store.record(action);
+        if (typeof this.trigger === "function") {
+          this.trigger("execute", action);
+        }
+        if (typeof this.onExecute === "function") {
+          this.onExecute(action);
+        }
       }
     };
 
@@ -1807,7 +1795,8 @@ var qEndingLine = captureLine();
 
     Commandant.prototype._agg = function(action) {
       var agg, prev_action, _base;
-      if (prev_action = this.getUndoAction()) {
+      prev_action = this._compound ? this._compound[this._compound.length - 1] : this.getUndoAction();
+      if (prev_action) {
         if (agg = typeof (_base = this.commands[prev_action.name]).aggregate === "function" ? _base.aggregate(prev_action, action) : void 0) {
           prev_action.name = agg.name;
           prev_action.data = agg.data;
@@ -1836,6 +1825,7 @@ var qEndingLine = captureLine();
     Commandant.prototype.redo = function() {
       var action;
       this._assert(!this._transient, 'Cannot redo while transient action active.');
+      this._assert(!this._transient, 'Cannot redo while compound action active.');
       action = this.getRedoActions(true);
       if (!action) {
         return;
@@ -1852,6 +1842,7 @@ var qEndingLine = captureLine();
     Commandant.prototype.undo = function() {
       var action;
       this._assert(!this._transient, 'Cannot undo while transient action active.');
+      this._assert(!this._transient, 'Cannot undo while compound action active.');
       action = this.getUndoAction(true);
       if (!action) {
         return;
@@ -1902,8 +1893,20 @@ var qEndingLine = captureLine();
       };
     };
 
-    Commandant.prototype.compound = function() {
-      return this.transient('__compound', []);
+    Commandant.prototype.captureCompound = function() {
+      this._assert(!this._transient, 'Cannot captureCompound while transient action active.');
+      return this._compound = [];
+    };
+
+    Commandant.prototype.finishCompound = function() {
+      var cmds;
+      this._assert(!this._transient, 'Cannot finishCompound while transient action active.');
+      cmds = this._compound;
+      this._compound = null;
+      this._push({
+        name: '__compound',
+        data: cmds
+      });
     };
 
     Commandant.prototype._scope = function(command, data) {
@@ -2071,7 +2074,7 @@ var qEndingLine = captureLine();
       return promise;
     };
 
-    Async.prototype.compound = function() {
+    Async.prototype.captureCompound = function() {
       throw 'Compound not yet supported in Async mode';
     };
 

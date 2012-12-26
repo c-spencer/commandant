@@ -50,19 +50,13 @@ class Commandant
   constructor: (@scope, opts = {}) ->
     @commands = {
       __compound:
-        init: -> []
         run: (scope, data) =>
           for action in data
-            @commands[action.name].run(scope, action.data)
+            @_run(action, 'run')
           return
-        update: (scope, prev_data, name, args...) =>
-          command = @commands[name]
-          data = command.init.apply(command, [@scope, args...])
-          prev_data.push { name, data }
-          @_run({ name, data }, 'run')
         undo: (scope, data) =>
           for action in data
-            @commands[action.name].undo(scope, action.data)
+            @_run(action, 'undo')
           return
     }
 
@@ -70,6 +64,8 @@ class Commandant
     @opts = { pedantic: if opts.pedantic? then opts.pedantic else true }
 
     @store = new StackStore
+
+    @_compound = null
 
   # Allow creation of new Commandants with predefined commands.
   @define: (commands={}) ->
@@ -90,9 +86,12 @@ class Commandant
 
   # Push an action
   _push: (action) ->
-    @store.record(action)
-    @trigger?("execute", action)
-    @onExecute?(action)
+    if @_compound
+      @_compound.push(action)
+    else
+      @store.record(action)
+      @trigger?("execute", action)
+      @onExecute?(action)
 
     return
 
@@ -159,7 +158,12 @@ class Commandant
 
   # Try and aggregate an action given the current state.
   _agg: (action) ->
-    if prev_action = @getUndoAction()
+    prev_action = if @_compound
+      @_compound[@_compound.length - 1]
+    else
+      @getUndoAction()
+
+    if prev_action
       if agg = @commands[prev_action.name].aggregate?(prev_action, action)
         prev_action.name = agg.name
         prev_action.data = agg.data
@@ -190,6 +194,7 @@ class Commandant
   # Run the Commandant redos one step. Does nothing if at end of chain.
   redo: ->
     @_assert(!@_transient, 'Cannot redo while transient action active.')
+    @_assert(!@_transient, 'Cannot redo while compound action active.')
 
     action = @getRedoActions(true)
     return unless action
@@ -203,6 +208,7 @@ class Commandant
   # Run the Commandant undos one step. Does nothing if at start of chain.
   undo: ->
     @_assert(!@_transient, 'Cannot undo while transient action active.')
+    @_assert(!@_transient, 'Cannot undo while compound action active.')
 
     action = @getUndoAction(true)
     return unless action
@@ -253,8 +259,18 @@ class Commandant
         return
     }
 
-  # Convenice method for using the transient __compound Command.
-  compound: -> @transient('__compound', [])
+  # Compound command capture
+  captureCompound: ->
+    @_assert(!@_transient, 'Cannot captureCompound while transient action active.')
+    @_compound = []
+
+  finishCompound: ->
+    @_assert(!@_transient, 'Cannot finishCompound while transient action active.')
+    cmds = @_compound
+    @_compound = null
+
+    @_push({ name: '__compound', data: cmds })
+    return
 
   # Private helpers
 
@@ -383,7 +399,7 @@ class Commandant.Async extends Commandant
 
     promise
 
-  compound: ->
+  captureCompound: ->
     throw 'Compound not yet supported in Async mode'
 
   transient: ->

@@ -101,19 +101,16 @@ new_element_2 = keen.execute('CREATE_ELEMENT', 'circle', 100, 100);
 ## Compound Commands
 
 Compound actions are groups of actions that are run and undone in a single step.
-They are implemented as a default command '__compound', with a helper function
-Commandant.compound() for accessing it.
+They are created via normal commands, with the Commandant put into capture mode
+with `captureCompound` and `finishCompound`.
 
 ``` javascript
-var compound = keen.compound();
-compound.update('CREATE_ELEMENT', 'circle', 100, 100);
-compound.update('CREATE_ELEMENT', 'circle', 100, 100);
-compound.update('CREATE_ELEMENT', 'circle', 100, 100);
-compound.finish();
+keen.captureCompound();
+keen.execute('CREATE_ELEMENT', 'circle', 100, 100);
+keen.execute('CREATE_ELEMENT', 'circle', 100, 100);
+keen.execute('CREATE_ELEMENT', 'circle', 100, 100);
+keen.finishCompound();
 ```
-
-Compounds are very likely to change in future, the current implementation is
-mostly just to see how well they could be implemented as a Command.
 
 ## Bound Commandants
 
@@ -185,8 +182,7 @@ Runs the given function with no recording of new actions (but still executing).
 ## Command Implementation Considerations
 
 When a command is executed, any other executions caused by that execution will
-run themselves, but will not be recorded. (This may change with a form of opt-in
-automatic compound command collection.)
+run themselves, but will not be recorded.
 
 When objects are created in commands, they should be identified and modified via
 stable ids, rather than directly on the object. This is because if the object is
@@ -206,7 +202,7 @@ place, unless you turn off pedantic mode. (`new Commandant(o, {pedantic: false}`
 
 - While a transient is active, the Commandant execute, redo, undo, and transient
   functions will all throw exceptions.
-- TODO: while a compound is active, the same functions will also throw.
+- While a compound is active, redo and undo will throw exceptions.
 
 These are put in place to avoid, and make obvious, possible concurrency issues.
 

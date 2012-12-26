@@ -128,6 +128,31 @@ exports['Basic Commandant'] = {
     test.deepEqual(keen.storeStats(), { length: 0, position: 0 });
     test.deepEqual(counters, { init: 5, run: 7, undo: 4, scope: 13, update: 2, aggregate: 3 });
 
+    keen.captureCompound();
+    keen.execute('TEST_COMMAND', 1, 2);
+    keen.execute('TEST_COMMAND', 2, 3);
+    keen.execute('TEST_COMMAND', 3, 4);
+    keen.finishCompound();
+
+    test.deepEqual(keen.storeStats(), { length: 1, position: 1 });
+    test.deepEqual(counters, { init: 8, run: 10, undo: 4, scope: 16, update: 2, aggregate: 5 });
+
+    keen.undo();
+    test.deepEqual(counters, { init: 8, run: 10, undo: 7, scope: 19, update: 2, aggregate: 5 });
+
+    keen.redo();
+    test.deepEqual(counters, { init: 8, run: 13, undo: 7, scope: 22, update: 2, aggregate: 5 });
+
+    keen.execute('TEST_COMMAND', 5, 6);
+    test.deepEqual(counters, { init: 9, run: 14, undo: 7, scope: 23, update: 2, aggregate: 5 });
+
+    keen.captureCompound();
+    var c_trans = keen.transient('TEST_COMMAND', 1, 2);
+    c_trans.update(3, 4);
+    c_trans.finish();
+    keen.finishCompound();
+    test.deepEqual(counters, { init: 10, run: 15, undo: 7, scope: 25, update: 3, aggregate: 5 });
+
     test.done();
   },
   'async operations': function (test) {
