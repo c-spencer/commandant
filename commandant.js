@@ -293,40 +293,53 @@
     };
 
     Commandant.prototype.transient = function() {
-      var args, command, data, name, ret_val,
-        _this = this;
+      var args, command, data, name, ret_val;
       name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       command = this.commands[name];
       this._assert(command.update != null, "Command " + name + " does not support transient calling.");
-      this._transient = true;
       this._silent = true;
       data = command.init.apply(command, [this.scope].concat(__slice.call(args)));
-      ret_val = command.run(this._scope(command, data), data);
-      return {
-        update: function() {
-          var args;
-          args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
-          data = command.update.apply(command, [_this._scope(command, data), data].concat(__slice.call(args)));
-        },
-        finish: function() {
-          var action;
-          _this._transient = false;
-          _this._silent = false;
-          action = {
-            name: name,
-            data: data
-          };
-          if (!_this._agg(action)) {
-            _this._push(action);
-          }
-          return ret_val;
-        },
-        cancel: function() {
-          command.undo(scope, data);
-          _this._transient = false;
-          _this._silent = false;
-        }
+      ret_val = this._run({
+        name: name,
+        data: data
+      }, 'run');
+      this._transient = {
+        name: name,
+        data: data,
+        ret_val: ret_val
       };
+    };
+
+    Commandant.prototype.update = function() {
+      var args;
+      args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      this._assert(this._transient, 'Cannot update without a transient action active.');
+      return this._transient.data = this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)));
+    };
+
+    Commandant.prototype.finishTransient = function() {
+      var action, ret_val;
+      this._assert(this._transient, 'Cannot finishTransient without a transient action active.');
+      action = {
+        name: this._transient.name,
+        data: this._transient.data
+      };
+      ret_val = this._transient.ret_val;
+      this._transient = null;
+      this._silent = false;
+      if (!this._agg(action)) {
+        this._push(action);
+      }
+      return ret_val;
+    };
+
+    Commandant.prototype.cancelTransient = function() {
+      var undo;
+      this._assert(this._transient, 'Cannot cancelTransient without a transient action active.');
+      undo = this._run(this._transient, 'undo');
+      this._transient = null;
+      this._silent = false;
+      return undo;
     };
 
     Commandant.prototype.captureCompound = function() {
@@ -337,6 +350,7 @@
     Commandant.prototype.finishCompound = function() {
       var cmds;
       this._assert(!this._transient, 'Cannot finishCompound while transient action active.');
+      this._assert(this._compound, 'Cannot finishCompound without compound capture active.');
       cmds = this._compound;
       this._compound = null;
       this._push({
@@ -345,26 +359,20 @@
       });
     };
 
-    Commandant.prototype._scope = function(command, data) {
-      if (command.scope) {
-        return command.scope(this.scope, data);
-      } else {
-        return this.scope;
-      }
-    };
-
     Commandant.prototype._assert = function(val, message) {
       if (this.opts.pedantic && !val) {
         throw message;
       }
     };
 
-    Commandant.prototype._run = function(action, method) {
-      var command,
+    Commandant.prototype._run = function() {
+      var action, args, command, method, scope,
         _this = this;
+      action = arguments[0], method = arguments[1], args = 3 <= arguments.length ? __slice.call(arguments, 2) : [];
       command = this.commands[action.name];
+      scope = command.scope ? command.scope(this.scope, action.data) : this.scope;
       return this.silent(function() {
-        return command[method](_this._scope(command, action.data), action.data);
+        return command[method].apply(command, [scope, action.data].concat(__slice.call(args)));
       });
     };
 
@@ -441,9 +449,7 @@
       fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       deferred = Q.defer();
       defer_fn = function() {
-        var result_promise;
-        result_promise = Q.resolve(fn.apply(_this, args));
-        return result_promise.then(function(result) {
+        return Q.resolve(fn.apply(_this, args)).then(function(result) {
           return deferred.resolve(result);
         });
       };
@@ -478,27 +484,23 @@
     };
 
     Async.prototype._executeAsync = function(name, args) {
-      var command, data_promise, deferred,
+      var action, command,
         _this = this;
       this._assert(!this._transient, 'Cannot execute while transient action active.');
       command = this.commands[name];
-      deferred = Q.defer();
-      data_promise = Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args))));
-      data_promise.then(function(data) {
-        var action, result_promise;
+      action = null;
+      return Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args)))).then(function(data) {
         action = {
           name: name,
           data: data
         };
-        result_promise = Q.resolve(_this._run(action, 'run'));
-        return result_promise.then(function(result) {
-          if (_this._silent || !_this._agg(action)) {
-            _this._push(action);
-          }
-          return deferred.resolve(result);
-        });
+        return Q.resolve(_this._run(action, 'run'));
+      }).then(function(result) {
+        if (_this._silent || !_this._agg(action)) {
+          _this._push(action);
+        }
+        return result;
       });
-      return deferred.promise;
     };
 
     Async.prototype.redo = function() {
@@ -506,7 +508,7 @@
     };
 
     Async.prototype._redoAsync = function() {
-      var action, promise,
+      var action,
         _this = this;
       this._assert(!this._transient, 'Cannot redo while transient action active.');
       this._assert(!this._compound, 'Cannot redo while compound action active.');
@@ -514,14 +516,12 @@
       if (!action) {
         return Q.resolve(void 0);
       }
-      promise = Q.resolve(this._run(action, 'run'));
-      promise.then(function() {
+      return Q.resolve(this._run(action, 'run')).then(function() {
         if (typeof _this.trigger === "function") {
           _this.trigger('redo', action);
         }
         return typeof _this.onRedo === "function" ? _this.onRedo(action) : void 0;
       });
-      return promise;
     };
 
     Async.prototype.undo = function() {
@@ -529,7 +529,7 @@
     };
 
     Async.prototype._undoAsync = function() {
-      var action, promise,
+      var action,
         _this = this;
       this._assert(!this._transient, 'Cannot undo while transient action active.');
       this._assert(!this._compound, 'Cannot undo while compound action active.');
@@ -537,14 +537,12 @@
       if (!action) {
         return Q.resolve(void 0);
       }
-      promise = Q.resolve(this._run(action, 'undo'));
-      promise.then(function() {
+      return Q.resolve(this._run(action, 'undo')).then(function() {
         if (typeof _this.trigger === "function") {
           _this.trigger('undo', action);
         }
         return typeof _this.onUndo === "function" ? _this.onUndo(action) : void 0;
       });
-      return promise;
     };
 
     Async.prototype.captureCompound = function() {
@@ -556,7 +554,48 @@
     };
 
     Async.prototype.transient = function() {
-      throw 'Transient not yet supported in Async mode';
+      var args, name;
+      name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      return this._defer(this._transientAsync, name, args);
+    };
+
+    Async.prototype._transientAsync = function(name, args) {
+      var command,
+        _this = this;
+      command = this.commands[name];
+      this._assert(command.update != null, "Command " + name + " does not support transient calling.");
+      this._silent = true;
+      this._transient = {
+        name: name
+      };
+      return Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args)))).then(function(data) {
+        _this._transient.data = data;
+        return Q.resolve(_this._run(_this._transient, 'run'));
+      }).then(function(ret_val) {
+        return _this._transient.ret_val = ret_val;
+      });
+    };
+
+    Async.prototype.update = function() {
+      var args;
+      args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
+      return this._defer(this._updateAsync, args);
+    };
+
+    Async.prototype._updateAsync = function(args) {
+      var _this = this;
+      this._assert(this._transient, 'Cannot update without a transient action active.');
+      return Q.resolve(this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)))).then(function(data) {
+        return _this._transient.data = data;
+      });
+    };
+
+    Async.prototype.finishTransient = function() {
+      return this._defer(Commandant.prototype.finishTransient);
+    };
+
+    Async.prototype.cancelTransient = function() {
+      return this._defer(Commandant.prototype.cancelTransient);
     };
 
     return Async;

@@ -4,6 +4,7 @@ if typeof require != 'undefined'
   catch exc
 
 
+# Store for a linear series of actions.
 class StackStore
   constructor: ->
     @reset()
@@ -236,31 +237,43 @@ class Commandant
     @_assert(command.update?,
       "Command #{name} does not support transient calling.")
 
-    @_transient = true
     @_silent = true
 
     data = command.init.apply(command, [@scope, args...])
-    ret_val = command.run(@_scope(command, data), data)
+    ret_val = @_run({ name, data }, 'run')
 
-    return {
-      update: (args...) =>
-        data = command.update.apply(command, [@_scope(command, data), data, args...])
-        return
-      finish: =>
-        @_transient = false
-        @_silent = false
+    @_transient = { name, data, ret_val }
 
-        action = { name, data }
-        if !@_agg(action)
-          @_push(action)
+    return
 
-        return ret_val
-      cancel: =>
-        command.undo(scope, data)
-        @_transient = false
-        @_silent = false
-        return
-    }
+  update: (args...) ->
+    @_assert(@_transient, 'Cannot update without a transient action active.')
+
+    @_transient.data = @_run.apply(@, [@_transient, 'update', args...])
+
+  finishTransient: ->
+    @_assert(@_transient, 'Cannot finishTransient without a transient action active.')
+
+    action = { name: @_transient.name, data: @_transient.data }
+    ret_val = @_transient.ret_val
+
+    @_transient = null
+    @_silent = false
+
+    if !@_agg(action)
+      @_push(action)
+
+    ret_val
+
+  cancelTransient: ->
+    @_assert(@_transient, 'Cannot cancelTransient without a transient action active.')
+
+    undo = @_run(@_transient, 'undo')
+
+    @_transient = null
+    @_silent = false
+
+    return undo
 
   # Compound command capture
   captureCompound: ->
@@ -269,6 +282,7 @@ class Commandant
 
   finishCompound: ->
     @_assert(!@_transient, 'Cannot finishCompound while transient action active.')
+    @_assert(@_compound, 'Cannot finishCompound without compound capture active.')
     cmds = @_compound
     @_compound = null
 
@@ -276,21 +290,16 @@ class Commandant
     return
 
   # Private helpers
-
-  # Resolve a commands scope.
-  _scope: (command, data) ->
-    if command.scope then command.scope(@scope, data) else @scope
-
   _assert: (val, message) ->
     if @opts.pedantic and !val
       throw message
     return
 
-  # Helper method for running a method on an action.
-  _run: (action, method) ->
+  # Helper method for running a scoped method on an action.
+  _run: (action, method, args...) ->
     command = @commands[action.name]
-    @silent(=> command[method](@_scope(command, action.data), action.data))
-
+    scope = if command.scope then command.scope(@scope, action.data) else @scope
+    @silent(=> command[method].apply(command, [scope, action.data, args...]))
 
 # Asynchronous version, using the Q promise library.
 class Commandant.Async extends Commandant
@@ -343,9 +352,7 @@ class Commandant.Async extends Commandant
     deferred = Q.defer()
 
     defer_fn = =>
-      result_promise = Q.resolve(fn.apply(@, args))
-
-      result_promise.then (result) ->
+      Q.resolve(fn.apply(@, args)).then (result) ->
         deferred.resolve(result)
 
     @_deferQueue.push defer_fn
@@ -379,22 +386,15 @@ class Commandant.Async extends Commandant
     @_assert(!@_transient, 'Cannot execute while transient action active.')
 
     command = @commands[name]
+    action = null
 
-    deferred = Q.defer()
-
-    data_promise = Q.resolve(command.init.apply(command, [@scope, args...]))
-
-    data_promise.then (data) =>
+    Q.resolve(command.init.apply(command, [@scope, args...])).then (data) =>
       action = { name, data }
-
-      result_promise = Q.resolve(@_run(action, 'run'))
-
-      result_promise.then (result) =>
-        if @_silent or !@_agg(action)
-          @_push(action)
-        deferred.resolve(result)
-
-    deferred.promise
+      Q.resolve(@_run(action, 'run'))
+    .then (result) =>
+      if @_silent or !@_agg(action)
+        @_push(action)
+      result
 
   redo: ->
     @_defer(@_redoAsync)
@@ -405,13 +405,10 @@ class Commandant.Async extends Commandant
 
     action = @getRedoActions(true)
     return Q.resolve(undefined) unless action
-    promise = Q.resolve(@_run(action, 'run'))
 
-    promise.then =>
+    Q.resolve(@_run(action, 'run')).then =>
       @trigger?('redo', action)
       @onRedo?(action)
-
-    promise
 
   undo: ->
     @_defer(@_undoAsync)
@@ -422,13 +419,10 @@ class Commandant.Async extends Commandant
 
     action = @getUndoAction(true)
     return Q.resolve(undefined) unless action
-    promise = Q.resolve(@_run(action, 'undo'))
 
-    promise.then =>
+    Q.resolve(@_run(action, 'undo')).then =>
       @trigger?('undo', action)
       @onUndo?(action)
-
-    promise
 
   captureCompound: ->
     @_defer(Commandant::captureCompound)
@@ -436,9 +430,38 @@ class Commandant.Async extends Commandant
   finishCompound: ->
     @_defer(Commandant::finishCompound)
 
-  transient: ->
-    throw 'Transient not yet supported in Async mode'
+  transient: (name, args...) ->
+    @_defer(@_transientAsync, name, args)
 
+  _transientAsync: (name, args) ->
+    command = @commands[name]
+
+    @_assert(command.update?,
+      "Command #{name} does not support transient calling.")
+
+    @_silent = true
+    @_transient = { name }
+
+    Q.resolve(command.init.apply(command, [@scope, args...])).then (data) =>
+      @_transient.data = data
+      Q.resolve(@_run(@_transient, 'run'))
+    .then (ret_val) =>
+      @_transient.ret_val = ret_val
+
+  update: (args...) ->
+    @_defer(@_updateAsync, args)
+
+  _updateAsync: (args) ->
+    @_assert(@_transient, 'Cannot update without a transient action active.')
+
+    Q.resolve(@_run.apply(@, [@_transient, 'update', args...])).then (data) =>
+      @_transient.data = data
+
+  finishTransient: ->
+    @_defer(Commandant::finishTransient)
+
+  cancelTransient: ->
+    @_defer(Commandant::cancelTransient)
 
 if typeof module != 'undefined'
   module.exports = Commandant

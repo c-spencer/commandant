@@ -62,13 +62,13 @@ exports['Basic Commandant'] = {
       }
     });
 
-    var trans = keen.transient('TEST_COMMAND', 10, 20);
+    keen.transient('TEST_COMMAND', 10, 20);
     test.deepEqual(counters, { init: 1, run: 1, undo: 0, scope: 1, update: 0, aggregate: 0 });
 
-    trans.update(20, 30);
+    keen.update(20, 30);
     test.deepEqual(counters, { init: 1, run: 1, undo: 0, scope: 2, update: 1, aggregate: 0 });
 
-    var trans_result = trans.finish();
+    var trans_result = keen.finishTransient();
     test.equal(trans_result, 70);
     test.deepEqual(counters, { init: 1, run: 1, undo: 0, scope: 2, update: 1, aggregate: 0 });
 
@@ -112,12 +112,12 @@ exports['Basic Commandant'] = {
     test.deepEqual(keen.getUndoAction(),
                     { name: 'TEST_COMMAND', data: { arg1: 110, arg2: 70, sum: 180 }});
 
-    var new_trans = keen.transient('TEST_COMMAND', 10, 20);
+    keen.transient('TEST_COMMAND', 10, 20);
     test.deepEqual(keen.getUndoAction(),
                     { name: 'TEST_COMMAND', data: { arg1: 110, arg2: 70, sum: 180 }});
 
-    new_trans.update(50, 100);
-    new_trans.finish();
+    keen.update(50, 100);
+    keen.finishTransient();
     test.deepEqual(keen.getUndoAction(),
                     { name: 'TEST_COMMAND', data: { arg1: 160, arg2: 170, sum: 330 }});
 
@@ -147,9 +147,9 @@ exports['Basic Commandant'] = {
     test.deepEqual(counters, { init: 9, run: 14, undo: 7, scope: 23, update: 2, aggregate: 5 });
 
     keen.captureCompound();
-    var c_trans = keen.transient('TEST_COMMAND', 1, 2);
-    c_trans.update(3, 4);
-    c_trans.finish();
+    keen.transient('TEST_COMMAND', 1, 2);
+    keen.update(3, 4);
+    keen.finishTransient();
     keen.finishCompound();
     test.deepEqual(counters, { init: 10, run: 15, undo: 7, scope: 25, update: 3, aggregate: 5 });
 
@@ -189,6 +189,11 @@ exports['Basic Commandant'] = {
         }, 5);
 
         return deferred.promise;
+      },
+      update: function (scope, prev, data) {
+        scope.data -= prev + 10;
+        scope.data += data + 10;
+        return data;
       },
       undo: function (scope, data) {
         ++counters.undo;
@@ -250,7 +255,9 @@ exports['Basic Commandant'] = {
     }).then(function () {
       keen.captureCompound();
       keen.execute('ASYNC_COMMAND', 10);
-      keen.execute('ASYNC_COMMAND', 20);
+      keen.transient('ASYNC_COMMAND', 10);
+      keen.update(20);
+      keen.finishTransient();
       return keen.finishCompound();
     }).then(function () {
       test.equal(test_target.data, 250);

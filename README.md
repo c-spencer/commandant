@@ -82,17 +82,17 @@ duplication of code.
 
 ``` javascript
 // Create our element
-var new_element_action = keen.transient('CREATE_ELEMENT', 'square', 50, 50);
+keen.transient('CREATE_ELEMENT', 'square', 50, 50);
 
 // Update the x, y (as taken by the update function). This could reconfigure the
 // element completely, but in this case it's specialised to just edit position.
-new_element_action.update(40, 60);
-new_element_action.update(50, 80);
+keen.update(40, 60);
+keen.update(50, 80);
 
-// Completes the action, and records the final result. Can also run .cancel() to
-// rollback the change and not have an action recorded. Return value is the
-// result of the 'run' function just after initialisation.
-new_element = new_element_action.finish();
+// Completes the action, and records the final result. Can also run
+// .cancelTransient() to rollback the change and not have an action recorded.
+// Return value is the result of the 'run' function just after initialisation.
+new_element = keen.finishTransient();
 
 // Can use the same command in a non-transient manner.
 new_element_2 = keen.execute('CREATE_ELEMENT', 'circle', 100, 100);
@@ -200,8 +200,8 @@ When implementing commands, Commandant tries to provide safety through how its
 API is defined, but cannot guarantee it. The following limitations are put in
 place, unless you turn off pedantic mode. (`new Commandant(o, {pedantic: false}`)
 
-- While a transient is active, the Commandant execute, redo, undo, and transient
-  functions will all throw exceptions.
+- While a transient is active, `execute`, `redo`, `undo`, and `transient`,
+  `captureCompound` and `finishCompound` will throw exceptions.
 - While a compound is active, redo and undo will throw exceptions.
 
 These are put in place to avoid, and make obvious, possible concurrency issues.
@@ -210,9 +210,8 @@ These are put in place to avoid, and make obvious, possible concurrency issues.
 
 - More examples, particularly an interactive one.
 - More documentation.
-- Action Aggregation (e.g. automatic merging of several actions into one)
 - Asynchronous Commands (based on promises)
-- Action stack synchronisation and broadcast (for basic document collaboration)
+- Action stack synchronisation.
 
 ## License
 
