@@ -8,10 +8,20 @@ module.exports = function (grunt) {
     test: {
       files: ['test/*.js']
     },
+    concat: {
+      dist: {
+        src: ['./node_modules/q/q.js', './commandant.js'],
+        dest: './commandant.q.js'
+      }
+    },
     min: {
       dist: {
         src: ['./commandant.js'],
         dest: './commandant.min.js'
+      },
+      dist_q: {
+        src: ['./commandant.q.js'],
+        dest: './commandant.q.min.js'
       }
     },
     uglify: {
@@ -30,5 +40,5 @@ module.exports = function (grunt) {
     }
   });
 
-  grunt.registerTask('default', 'coffee lint test min');
+  grunt.registerTask('default', 'coffee lint test concat min');
 };

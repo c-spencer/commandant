@@ -1,4 +1,5 @@
 var Commandant = require('../commandant');
+var Q = require('q');
 
 exports['Basic Commandant'] = {
   'basic operations': function (test) {
@@ -124,5 +125,92 @@ exports['Basic Commandant'] = {
     test.deepEqual(counters, { init: 5, run: 7, undo: 4, scope: 13, update: 2, aggregate: 3 });
 
     test.done();
+  },
+  'async operations': function (test) {
+    var test_target = {data: 0};
+    var keen = new Commandant.Async(test_target);
+
+    var counters = { init: 0, run: 0, undo: 0, scope: 0, update: 0, aggregate: 0 };
+
+    test.expect(14);
+
+    keen.register('ASYNC_COMMAND', {
+      init: function (scope, arg) {
+        ++counters.init;
+        var deferred = Q.defer();
+
+        setTimeout(function () {
+          deferred.resolve(arg);
+        }, 5);
+
+        return deferred.promise;
+      },
+      scope: function (scope) {
+        ++counters.scope;
+        return scope;
+      },
+      run: function (scope, data) {
+        ++counters.run;
+
+        var deferred = Q.defer();
+
+        setTimeout(function () {
+          scope.data += data + 10;
+          deferred.resolve(scope.data);
+        }, 5);
+
+        return deferred.promise;
+      },
+      undo: function (scope, data) {
+        ++counters.undo;
+        scope.data -= data + 10;
+      }
+    });
+
+    result1 = keen.execute('ASYNC_COMMAND', 50);
+    test.deepEqual(counters, { init: 1, run: 0, undo: 0, scope: 0, update: 0, aggregate: 0 });
+
+    result2 = keen.execute('ASYNC_COMMAND', 90);
+    test.deepEqual(counters, { init: 1, run: 0, undo: 0, scope: 0, update: 0, aggregate: 0 });
+
+    result1.then(function (d) {
+      test.deepEqual(counters, { init: 1, run: 1, undo: 0, scope: 1, update: 0, aggregate: 0 });
+
+      test.equal(d, 60);
+      test.equal(test_target.data, 60);
+    });
+
+    result2.then(function (d) {
+      test.deepEqual(counters, { init: 2, run: 2, undo: 0, scope: 2, update: 0, aggregate: 0 });
+
+      test.equal(d, 160);
+      test.equal(test_target.data, 160);
+    });
+
+    keen.undo().then(function () {
+      test.equal(test_target.data, 60);
+    });
+
+    keen.undo().then(function () {
+      test.equal(test_target.data, 0);
+    });
+
+    keen.undo().then(function () {
+      test.equal(test_target.data, 0);
+    });
+
+    keen.redo().then(function () {
+      test.equal(test_target.data, 60);
+    });
+
+    keen.redo().then(function () {
+      test.equal(test_target.data, 160);
+    });
+
+    keen.redo().then(function () {
+      test.equal(test_target.data, 160);
+      test.done();
+    });
+
   }
 };

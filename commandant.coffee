@@ -1,3 +1,9 @@
+if typeof require != 'undefined'
+  try
+    Q = require('q')
+  catch exc
+
+
 class StackStore
   constructor: ->
     @reset()
@@ -265,6 +271,128 @@ class Commandant
   _run: (action, method) ->
     command = @commands[action.name]
     @silent(=> command[method](@_scope(command, action.data), action.data))
+
+
+# Asynchronous version, using the Q promise library.
+class Commandant.Async extends Commandant
+
+  constructor: ->
+    super
+
+    if typeof Q == 'undefined'
+      throw 'Cannot run in asynchronous mode without Q available.'
+
+    @_running = null
+    @_deferQueue = []
+
+  silent: (fn) ->
+    if @_silent
+      promise = Q.resolve(fn())
+    else
+      @_silent = true
+      promise = Q.resolve(fn())
+      promise.fin =>
+        @_silent = false
+
+    promise
+
+  # Defer a method on the Commandant to be run later.
+  _defer: (method, args...) ->
+    console.log '_defer', method, args
+    deferred = Q.defer()
+
+    fn = =>
+      result_promise = Q.resolve(@[method].apply(@, args))
+
+      result_promise.then (result) ->
+        console.log 'resolving', method, args
+        deferred.resolve(result)
+
+    @_deferQueue.push fn
+
+    if !@_running
+      @_runDefer()
+
+    deferred.promise
+
+  # Consume the deferred function queue.
+  _runDefer: ->
+    return if @_running or @_deferQueue.length == 0
+
+    next_fn = @_deferQueue.shift()
+
+    @_running = next_fn()
+
+    @_running.then =>
+      @_running = null
+      @_runDefer()
+    , (err) =>
+      @_running = null
+      console.log("!! deferred function errored")
+
+    return
+
+  execute: (name, args...) ->
+    @_assert(!@_transient, 'Cannot execute while transient action active.')
+    @_defer('_executeAsync', name, args)
+
+  _executeAsync: (name, args) ->
+    console.log 'execute Async', name, args
+
+    command = @commands[name]
+
+    deferred = Q.defer()
+
+    data_promise = Q.resolve(command.init.apply(command, [@scope, args...]))
+
+    data_promise.then (data) =>
+      action = { name, data }
+
+      result_promise = Q.resolve(@_run(action, 'run'))
+
+      result_promise.then (result) =>
+        if @_silent or !@_agg(action)
+          @_push(action)
+        deferred.resolve(result)
+
+    deferred.promise
+
+  redo: ->
+    @_assert(!@_transient, 'Cannot redo while transient action active.')
+    @_defer('_redoAsync')
+
+  _redoAsync: ->
+    action = @getRedoActions(true)
+    return Q.resolve(undefined) unless action
+    promise = Q.resolve(@_run(action, 'run'))
+
+    promise.then =>
+      @trigger?('redo', action)
+      @onRedo?(action)
+
+    promise
+
+  undo: ->
+    @_assert(!@_transient, 'Cannot undo while transient action active.')
+    @_defer('_undoAsync')
+
+  _undoAsync: ->
+    action = @getUndoAction(true)
+    return Q.resolve(undefined) unless action
+    promise = Q.resolve(@_run(action, 'undo'))
+
+    promise.then =>
+      @trigger?('undo', action)
+      @onUndo?(action)
+
+    promise
+
+  compound: ->
+    throw 'Compound not yet supported in Async mode'
+
+  transient: ->
+    throw 'Transient not yet supported in Async mode'
+
 
 if typeof module != 'undefined'
   module.exports = Commandant

@@ -1,6 +1,16 @@
 (function() {
-  var Commandant, StackStore,
-    __slice = [].slice;
+  var Commandant, Q, StackStore,
+    __slice = [].slice,
+    __hasProp = {}.hasOwnProperty,
+    __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
+
+  if (typeof require !== 'undefined') {
+    try {
+      Q = require('q');
+    } catch (exc) {
+
+    }
+  }
 
   StackStore = (function() {
 
@@ -356,6 +366,159 @@
     return Commandant;
 
   })();
+
+  Commandant.Async = (function(_super) {
+
+    __extends(Async, _super);
+
+    function Async() {
+      Async.__super__.constructor.apply(this, arguments);
+      if (typeof Q === 'undefined') {
+        throw 'Cannot run in asynchronous mode without Q available.';
+      }
+      this._running = null;
+      this._deferQueue = [];
+    }
+
+    Async.prototype.silent = function(fn) {
+      var promise,
+        _this = this;
+      if (this._silent) {
+        promise = Q.resolve(fn());
+      } else {
+        this._silent = true;
+        promise = Q.resolve(fn());
+        promise.fin(function() {
+          return _this._silent = false;
+        });
+      }
+      return promise;
+    };
+
+    Async.prototype._defer = function() {
+      var args, deferred, fn, method,
+        _this = this;
+      method = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      console.log('_defer', method, args);
+      deferred = Q.defer();
+      fn = function() {
+        var result_promise;
+        result_promise = Q.resolve(_this[method].apply(_this, args));
+        return result_promise.then(function(result) {
+          console.log('resolving', method, args);
+          return deferred.resolve(result);
+        });
+      };
+      this._deferQueue.push(fn);
+      if (!this._running) {
+        this._runDefer();
+      }
+      return deferred.promise;
+    };
+
+    Async.prototype._runDefer = function() {
+      var next_fn,
+        _this = this;
+      if (this._running || this._deferQueue.length === 0) {
+        return;
+      }
+      next_fn = this._deferQueue.shift();
+      this._running = next_fn();
+      this._running.then(function() {
+        _this._running = null;
+        return _this._runDefer();
+      }, function(err) {
+        _this._running = null;
+        return console.log("!! deferred function errored");
+      });
+    };
+
+    Async.prototype.execute = function() {
+      var args, name;
+      name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      this._assert(!this._transient, 'Cannot execute while transient action active.');
+      return this._defer('_executeAsync', name, args);
+    };
+
+    Async.prototype._executeAsync = function(name, args) {
+      var command, data_promise, deferred,
+        _this = this;
+      console.log('execute Async', name, args);
+      command = this.commands[name];
+      deferred = Q.defer();
+      data_promise = Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args))));
+      data_promise.then(function(data) {
+        var action, result_promise;
+        action = {
+          name: name,
+          data: data
+        };
+        result_promise = Q.resolve(_this._run(action, 'run'));
+        return result_promise.then(function(result) {
+          if (_this._silent || !_this._agg(action)) {
+            _this._push(action);
+          }
+          return deferred.resolve(result);
+        });
+      });
+      return deferred.promise;
+    };
+
+    Async.prototype.redo = function() {
+      this._assert(!this._transient, 'Cannot redo while transient action active.');
+      return this._defer('_redoAsync');
+    };
+
+    Async.prototype._redoAsync = function() {
+      var action, promise,
+        _this = this;
+      action = this.getRedoActions(true);
+      if (!action) {
+        return Q.resolve(void 0);
+      }
+      promise = Q.resolve(this._run(action, 'run'));
+      promise.then(function() {
+        if (typeof _this.trigger === "function") {
+          _this.trigger('redo', action);
+        }
+        return typeof _this.onRedo === "function" ? _this.onRedo(action) : void 0;
+      });
+      return promise;
+    };
+
+    Async.prototype.undo = function() {
+      this._assert(!this._transient, 'Cannot undo while transient action active.');
+      return this._defer('_undoAsync');
+    };
+
+    Async.prototype._undoAsync = function() {
+      var action, promise,
+        _this = this;
+      action = this.getUndoAction(true);
+      if (!action) {
+        return Q.resolve(void 0);
+      }
+      promise = Q.resolve(this._run(action, 'undo'));
+      promise.then(function() {
+        if (typeof _this.trigger === "function") {
+          _this.trigger('undo', action);
+        }
+        return typeof _this.onUndo === "function" ? _this.onUndo(action) : void 0;
+      });
+      return promise;
+    };
+
+    Async.prototype.compound = function() {
+      throw 'Compound not yet supported in Async mode';
+    };
+
+    Async.prototype.transient = function() {
+      throw 'Transient not yet supported in Async mode';
+    };
+
+    return Async;
+
+  })(Commandant);
 
   if (typeof module !== 'undefined') {
     module.exports = Commandant;
