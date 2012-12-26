@@ -55,7 +55,10 @@ class Commandant
             @_run(action, 'run')
           return
         undo: (scope, data) =>
-          for action in data
+          data_rev = data.slice()
+          data_rev.reverse()
+
+          for action in data_rev
             @_run(action, 'undo')
           return
     }
@@ -295,6 +298,29 @@ class Commandant.Async extends Commandant
   constructor: ->
     super
 
+    @commands = {
+      __compound:
+        run: (scope, data) =>
+          result = Q.resolve(undefined)
+
+          for action in data
+            do (action) =>
+              result = result.then => @_run(action, 'run')
+
+          result
+        undo: (scope, data) =>
+          result = Q.resolve(undefined)
+
+          data_rev = data.slice()
+          data_rev.reverse()
+
+          for action in data
+            do (action) =>
+              result = result.then => @_run(action, 'undo')
+
+          result
+    }
+
     if typeof Q == 'undefined'
       throw 'Cannot run in asynchronous mode without Q available.'
 
@@ -312,17 +338,17 @@ class Commandant.Async extends Commandant
 
     promise
 
-  # Defer a method on the Commandant to be run later.
-  _defer: (method, args...) ->
+  # Defer a fn to be run with the Commandant as scope.
+  _defer: (fn, args...) ->
     deferred = Q.defer()
 
-    fn = =>
-      result_promise = Q.resolve(@[method].apply(@, args))
+    defer_fn = =>
+      result_promise = Q.resolve(fn.apply(@, args))
 
       result_promise.then (result) ->
         deferred.resolve(result)
 
-    @_deferQueue.push fn
+    @_deferQueue.push defer_fn
 
     if !@_running
       @_runDefer()
@@ -342,15 +368,16 @@ class Commandant.Async extends Commandant
       @_runDefer()
     , (err) =>
       @_running = null
-      console.log("!! deferred function errored")
+      console.log("!! deferred function errored", err)
 
     return
 
   execute: (name, args...) ->
-    @_assert(!@_transient, 'Cannot execute while transient action active.')
-    @_defer('_executeAsync', name, args)
+    @_defer(@_executeAsync, name, args)
 
   _executeAsync: (name, args) ->
+    @_assert(!@_transient, 'Cannot execute while transient action active.')
+
     command = @commands[name]
 
     deferred = Q.defer()
@@ -370,10 +397,12 @@ class Commandant.Async extends Commandant
     deferred.promise
 
   redo: ->
-    @_assert(!@_transient, 'Cannot redo while transient action active.')
-    @_defer('_redoAsync')
+    @_defer(@_redoAsync)
 
   _redoAsync: ->
+    @_assert(!@_transient, 'Cannot redo while transient action active.')
+    @_assert(!@_compound, 'Cannot redo while compound action active.')
+
     action = @getRedoActions(true)
     return Q.resolve(undefined) unless action
     promise = Q.resolve(@_run(action, 'run'))
@@ -385,10 +414,12 @@ class Commandant.Async extends Commandant
     promise
 
   undo: ->
-    @_assert(!@_transient, 'Cannot undo while transient action active.')
-    @_defer('_undoAsync')
+    @_defer(@_undoAsync)
 
   _undoAsync: ->
+    @_assert(!@_transient, 'Cannot undo while transient action active.')
+    @_assert(!@_compound, 'Cannot undo while compound action active.')
+
     action = @getUndoAction(true)
     return Q.resolve(undefined) unless action
     promise = Q.resolve(@_run(action, 'undo'))
@@ -400,7 +431,10 @@ class Commandant.Async extends Commandant
     promise
 
   captureCompound: ->
-    throw 'Compound not yet supported in Async mode'
+    @_defer(Commandant::captureCompound)
+
+  finishCompound: ->
+    @_defer(Commandant::finishCompound)
 
   transient: ->
     throw 'Transient not yet supported in Async mode'

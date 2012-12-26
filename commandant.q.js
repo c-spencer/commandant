@@ -1652,9 +1652,11 @@ var qEndingLine = captureLine();
             }
           },
           undo: function(scope, data) {
-            var action, _i, _len;
-            for (_i = 0, _len = data.length; _i < _len; _i++) {
-              action = data[_i];
+            var action, data_rev, _i, _len;
+            data_rev = data.slice();
+            data_rev.reverse();
+            for (_i = 0, _len = data_rev.length; _i < _len; _i++) {
+              action = data_rev[_i];
               _this._run(action, 'undo');
             }
           }
@@ -1941,7 +1943,42 @@ var qEndingLine = captureLine();
     __extends(Async, _super);
 
     function Async() {
+      var _this = this;
       Async.__super__.constructor.apply(this, arguments);
+      this.commands = {
+        __compound: {
+          run: function(scope, data) {
+            var action, result, _fn, _i, _len;
+            result = Q.resolve(void 0);
+            _fn = function(action) {
+              return result = result.then(function() {
+                return _this._run(action, 'run');
+              });
+            };
+            for (_i = 0, _len = data.length; _i < _len; _i++) {
+              action = data[_i];
+              _fn(action);
+            }
+            return result;
+          },
+          undo: function(scope, data) {
+            var action, data_rev, result, _fn, _i, _len;
+            result = Q.resolve(void 0);
+            data_rev = data.slice();
+            data_rev.reverse();
+            _fn = function(action) {
+              return result = result.then(function() {
+                return _this._run(action, 'undo');
+              });
+            };
+            for (_i = 0, _len = data.length; _i < _len; _i++) {
+              action = data[_i];
+              _fn(action);
+            }
+            return result;
+          }
+        }
+      };
       if (typeof Q === 'undefined') {
         throw 'Cannot run in asynchronous mode without Q available.';
       }
@@ -1965,18 +2002,18 @@ var qEndingLine = captureLine();
     };
 
     Async.prototype._defer = function() {
-      var args, deferred, fn, method,
+      var args, defer_fn, deferred, fn,
         _this = this;
-      method = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
+      fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       deferred = Q.defer();
-      fn = function() {
+      defer_fn = function() {
         var result_promise;
-        result_promise = Q.resolve(_this[method].apply(_this, args));
+        result_promise = Q.resolve(fn.apply(_this, args));
         return result_promise.then(function(result) {
           return deferred.resolve(result);
         });
       };
-      this._deferQueue.push(fn);
+      this._deferQueue.push(defer_fn);
       if (!this._running) {
         this._runDefer();
       }
@@ -1996,20 +2033,20 @@ var qEndingLine = captureLine();
         return _this._runDefer();
       }, function(err) {
         _this._running = null;
-        return console.log("!! deferred function errored");
+        return console.log("!! deferred function errored", err);
       });
     };
 
     Async.prototype.execute = function() {
       var args, name;
       name = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      this._assert(!this._transient, 'Cannot execute while transient action active.');
-      return this._defer('_executeAsync', name, args);
+      return this._defer(this._executeAsync, name, args);
     };
 
     Async.prototype._executeAsync = function(name, args) {
       var command, data_promise, deferred,
         _this = this;
+      this._assert(!this._transient, 'Cannot execute while transient action active.');
       command = this.commands[name];
       deferred = Q.defer();
       data_promise = Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args))));
@@ -2031,13 +2068,14 @@ var qEndingLine = captureLine();
     };
 
     Async.prototype.redo = function() {
-      this._assert(!this._transient, 'Cannot redo while transient action active.');
-      return this._defer('_redoAsync');
+      return this._defer(this._redoAsync);
     };
 
     Async.prototype._redoAsync = function() {
       var action, promise,
         _this = this;
+      this._assert(!this._transient, 'Cannot redo while transient action active.');
+      this._assert(!this._compound, 'Cannot redo while compound action active.');
       action = this.getRedoActions(true);
       if (!action) {
         return Q.resolve(void 0);
@@ -2053,13 +2091,14 @@ var qEndingLine = captureLine();
     };
 
     Async.prototype.undo = function() {
-      this._assert(!this._transient, 'Cannot undo while transient action active.');
-      return this._defer('_undoAsync');
+      return this._defer(this._undoAsync);
     };
 
     Async.prototype._undoAsync = function() {
       var action, promise,
         _this = this;
+      this._assert(!this._transient, 'Cannot undo while transient action active.');
+      this._assert(!this._compound, 'Cannot undo while compound action active.');
       action = this.getUndoAction(true);
       if (!action) {
         return Q.resolve(void 0);
@@ -2075,7 +2114,11 @@ var qEndingLine = captureLine();
     };
 
     Async.prototype.captureCompound = function() {
-      throw 'Compound not yet supported in Async mode';
+      return this._defer(Commandant.prototype.captureCompound);
+    };
+
+    Async.prototype.finishCompound = function() {
+      return this._defer(Commandant.prototype.finishCompound);
     };
 
     Async.prototype.transient = function() {
