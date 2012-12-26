@@ -151,9 +151,6 @@ Supported events/hooks:
 onReset(rollback) / 'reset':
 Triggered when the Commandant is reset.
 
-onRegisterCommand(name, command) / 'register_command':
-Triggered when a new command is registered.
-
 onRedo(action) / 'redo':
 Triggered when an action is redone.
 
@@ -162,6 +159,12 @@ Triggered when an action is undone.
 
 onExecute(action) / 'execute':
 Triggered when a command is executed, or a transient completes.
+
+onUpdate(action) / 'update':
+Triggered when a transient action is updated.
+
+onChange(name, arg) / 'change':
+Triggered whenever any of the above are triggered.
 ```
 
 ## Additional API

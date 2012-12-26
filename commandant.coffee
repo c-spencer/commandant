@@ -1,12 +1,3 @@
-`// @exclude
-`
-if typeof require != 'undefined'
-  try
-    Q = require('q')
-  catch exc
-`// @endexclude
-`
-
 
 # Store for a linear series of actions.
 class StackStore
@@ -89,6 +80,13 @@ class Commandant
 
     fn
 
+  _hook: (name, arg) ->
+    @trigger?(name.toLowerCase(), arg)
+    @["on#{name}"]?(arg)
+
+    @trigger?('change', name, arg)
+    @onChange?(name, arg)
+
   # Expose some information on the action store.
   storeStats: ->
     @store.stats()
@@ -99,8 +97,7 @@ class Commandant
       @_compound.push(action)
     else
       @store.record(action)
-      @trigger?("execute", action)
-      @onExecute?(action)
+      @_hook('Execute', action)
 
     return
 
@@ -130,17 +127,13 @@ class Commandant
       @undo() while @getUndoAction()
     @store.reset()
 
-    @trigger?('reset', rollback)
-    @onReset?(rollback)
+    @_hook('Reset', rollback)
 
     return
 
   # Register a new named command to be available for execution.
   register: (name, command) ->
     @commands[name] = command
-
-    @trigger?('register_command', name, command)
-    @onRegisterCommand?(name, command)
 
     return
 
@@ -211,8 +204,7 @@ class Commandant
     return unless action
     @_run(action, 'run')
 
-    @trigger?('redo', action)
-    @onRedo?(action)
+    @_hook('Redo', action)
 
     return
 
@@ -225,8 +217,7 @@ class Commandant
     return unless action
     @_run(action, 'undo')
 
-    @trigger?('undo', action)
-    @onUndo?(action)
+    @_hook('Undo', action)
 
     return
 
@@ -255,6 +246,10 @@ class Commandant
     @_assert(@_transient, 'Cannot update without a transient action active.')
 
     @_transient.data = @_run.apply(@, [@_transient, 'update', args...])
+
+    @_hook('Update', @_transient)
+
+    return
 
   finishTransient: ->
     @_assert(@_transient, 'Cannot finishTransient without a transient action active.')
@@ -312,6 +307,12 @@ class Commandant
 
 `// @exclude
 `
+
+if typeof require != 'undefined'
+  try
+    Q = require('q')
+  catch exc
+
 # Asynchronous version, using the Q promise library.
 class Commandant.Async extends Commandant
 
@@ -420,8 +421,7 @@ class Commandant.Async extends Commandant
     return Q.resolve(undefined) unless action
 
     Q.when(@_run(action, 'run')).then =>
-      @trigger?('redo', action)
-      @onRedo?(action)
+      @_hook('Redo', action)
 
   undo: ->
     @_defer(@_undoAsync)
@@ -434,8 +434,7 @@ class Commandant.Async extends Commandant
     return Q.resolve(undefined) unless action
 
     Q.when(@_run(action, 'undo')).then =>
-      @trigger?('undo', action)
-      @onUndo?(action)
+      @_hook('Undo', action)
 
   captureCompound: ->
     @_defer(Commandant::captureCompound)
@@ -471,6 +470,9 @@ class Commandant.Async extends Commandant
 
     Q.when(@_run.apply(@, [@_transient, 'update', args...])).then (data) =>
       @_transient.data = data
+
+      @_hook('Update', @_transient)
+      return
 
   finishTransient: ->
     @_defer(Commandant::finishTransient)

@@ -1,23 +1,8 @@
 (function() {
-  // @exclude
-;
-
   var Commandant, Q, StackStore,
     __slice = [].slice,
     __hasProp = {}.hasOwnProperty,
     __extends = function(child, parent) { for (var key in parent) { if (__hasProp.call(parent, key)) child[key] = parent[key]; } function ctor() { this.constructor = child; } ctor.prototype = parent.prototype; child.prototype = new ctor(); child.__super__ = parent.prototype; return child; };
-
-  if (typeof require !== 'undefined') {
-    try {
-      Q = require('q');
-    } catch (exc) {
-
-    }
-  }
-
-  // @endexclude
-;
-
 
   StackStore = (function() {
 
@@ -131,6 +116,20 @@
       return fn;
     };
 
+    Commandant.prototype._hook = function(name, arg) {
+      var _name;
+      if (typeof this.trigger === "function") {
+        this.trigger(name.toLowerCase(), arg);
+      }
+      if (typeof this[_name = "on" + name] === "function") {
+        this[_name](arg);
+      }
+      if (typeof this.trigger === "function") {
+        this.trigger('change', name, arg);
+      }
+      return typeof this.onChange === "function" ? this.onChange(name, arg) : void 0;
+    };
+
     Commandant.prototype.storeStats = function() {
       return this.store.stats();
     };
@@ -140,12 +139,7 @@
         this._compound.push(action);
       } else {
         this.store.record(action);
-        if (typeof this.trigger === "function") {
-          this.trigger("execute", action);
-        }
-        if (typeof this.onExecute === "function") {
-          this.onExecute(action);
-        }
+        this._hook('Execute', action);
       }
     };
 
@@ -189,22 +183,11 @@
         }
       }
       this.store.reset();
-      if (typeof this.trigger === "function") {
-        this.trigger('reset', rollback);
-      }
-      if (typeof this.onReset === "function") {
-        this.onReset(rollback);
-      }
+      this._hook('Reset', rollback);
     };
 
     Commandant.prototype.register = function(name, command) {
       this.commands[name] = command;
-      if (typeof this.trigger === "function") {
-        this.trigger('register_command', name, command);
-      }
-      if (typeof this.onRegisterCommand === "function") {
-        this.onRegisterCommand(name, command);
-      }
     };
 
     Commandant.prototype.__silence = function(fn) {
@@ -277,12 +260,7 @@
         return;
       }
       this._run(action, 'run');
-      if (typeof this.trigger === "function") {
-        this.trigger('redo', action);
-      }
-      if (typeof this.onRedo === "function") {
-        this.onRedo(action);
-      }
+      this._hook('Redo', action);
     };
 
     Commandant.prototype.undo = function() {
@@ -294,12 +272,7 @@
         return;
       }
       this._run(action, 'undo');
-      if (typeof this.trigger === "function") {
-        this.trigger('undo', action);
-      }
-      if (typeof this.onUndo === "function") {
-        this.onUndo(action);
-      }
+      this._hook('Undo', action);
     };
 
     Commandant.prototype.transient = function() {
@@ -323,7 +296,8 @@
       var args;
       args = 1 <= arguments.length ? __slice.call(arguments, 0) : [];
       this._assert(this._transient, 'Cannot update without a transient action active.');
-      return this._transient.data = this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)));
+      this._transient.data = this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)));
+      this._hook('Update', this._transient);
     };
 
     Commandant.prototype.finishTransient = function() {
@@ -398,6 +372,14 @@
   // @exclude
 ;
 
+
+  if (typeof require !== 'undefined') {
+    try {
+      Q = require('q');
+    } catch (exc) {
+
+    }
+  }
 
   Commandant.Async = (function(_super) {
 
@@ -539,10 +521,7 @@
         return Q.resolve(void 0);
       }
       return Q.when(this._run(action, 'run')).then(function() {
-        if (typeof _this.trigger === "function") {
-          _this.trigger('redo', action);
-        }
-        return typeof _this.onRedo === "function" ? _this.onRedo(action) : void 0;
+        return _this._hook('Redo', action);
       });
     };
 
@@ -560,10 +539,7 @@
         return Q.resolve(void 0);
       }
       return Q.when(this._run(action, 'undo')).then(function() {
-        if (typeof _this.trigger === "function") {
-          _this.trigger('undo', action);
-        }
-        return typeof _this.onUndo === "function" ? _this.onUndo(action) : void 0;
+        return _this._hook('Undo', action);
       });
     };
 
@@ -611,7 +587,8 @@
       var _this = this;
       this._assert(this._transient, 'Cannot update without a transient action active.');
       return Q.when(this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)))).then(function(data) {
-        return _this._transient.data = data;
+        _this._transient.data = data;
+        _this._hook('Update', _this._transient);
       });
     };
 
