@@ -391,7 +391,7 @@
         __compound: {
           run: function(scope, data) {
             var action, result, _fn, _i, _len;
-            result = Q.resolve(void 0);
+            result = Q.when(void 0);
             _fn = function(action) {
               return result = result.then(function() {
                 return _this._run(action, 'run');
@@ -405,7 +405,7 @@
           },
           undo: function(scope, data) {
             var action, data_rev, result, _fn, _i, _len;
-            result = Q.resolve(void 0);
+            result = Q.when(void 0);
             data_rev = data.slice();
             data_rev.reverse();
             _fn = function(action) {
@@ -432,11 +432,10 @@
       var promise,
         _this = this;
       if (this._silent) {
-        promise = Q.resolve(fn());
+        promise = Q.when(fn());
       } else {
         this._silent = true;
-        promise = Q.resolve(fn());
-        promise.fin(function() {
+        promise = Q.when(fn()).fin(function() {
           return _this._silent = false;
         });
       }
@@ -449,8 +448,11 @@
       fn = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
       deferred = Q.defer();
       defer_fn = function() {
-        return Q.resolve(fn.apply(_this, args)).then(function(result) {
+        return Q.when(fn.apply(_this, args)).then(function(result) {
           return deferred.resolve(result);
+        }, function(err) {
+          console.log('Encountered error in deferred fn', err);
+          return deferred.reject(err);
         });
       };
       this._deferQueue.push(defer_fn);
@@ -468,12 +470,9 @@
       }
       next_fn = this._deferQueue.shift();
       this._running = next_fn();
-      this._running.then(function() {
+      this._running.fin(function() {
         _this._running = null;
         return _this._runDefer();
-      }, function(err) {
-        _this._running = null;
-        return console.log("!! deferred function errored", err);
       });
     };
 
@@ -516,7 +515,7 @@
       if (!action) {
         return Q.resolve(void 0);
       }
-      return Q.resolve(this._run(action, 'run')).then(function() {
+      return Q.when(this._run(action, 'run')).then(function() {
         if (typeof _this.trigger === "function") {
           _this.trigger('redo', action);
         }
@@ -537,7 +536,7 @@
       if (!action) {
         return Q.resolve(void 0);
       }
-      return Q.resolve(this._run(action, 'undo')).then(function() {
+      return Q.when(this._run(action, 'undo')).then(function() {
         if (typeof _this.trigger === "function") {
           _this.trigger('undo', action);
         }
@@ -568,9 +567,9 @@
       this._transient = {
         name: name
       };
-      return Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args)))).then(function(data) {
+      return Q.when(command.init.apply(command, [this.scope].concat(__slice.call(args)))).then(function(data) {
         _this._transient.data = data;
-        return Q.resolve(_this._run(_this._transient, 'run'));
+        return Q.when(_this._run(_this._transient, 'run'));
       }).then(function(ret_val) {
         return _this._transient.ret_val = ret_val;
       });
@@ -585,7 +584,7 @@
     Async.prototype._updateAsync = function(args) {
       var _this = this;
       this._assert(this._transient, 'Cannot update without a transient action active.');
-      return Q.resolve(this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)))).then(function(data) {
+      return Q.when(this._run.apply(this, [this._transient, 'update'].concat(__slice.call(args)))).then(function(data) {
         return _this._transient.data = data;
       });
     };

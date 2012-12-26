@@ -270,5 +270,31 @@ exports['Basic Commandant'] = {
       test.done();
     });
 
+    var start = Q.when(10);
+
+    var step1 = start.then(function (d) {
+      return d + 10;
+    });
+
+    var step2 = step1.then(function (d) {
+      throw 'sigh';
+    });
+
+    step2.fail(function (err) {
+      console.log();
+      console.log('got err1', err);
+    });
+
+    var step3 = step2.then(function (d) {
+      return d + 10;
+    });
+
+    var finish = step3.then(function (d) {
+      console.log();
+      console.log('finish', d);
+    }, function (err) {
+      console.log('got err2', err);
+    });
+
   }
 };

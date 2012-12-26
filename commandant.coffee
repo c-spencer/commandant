@@ -310,7 +310,7 @@ class Commandant.Async extends Commandant
     @commands = {
       __compound:
         run: (scope, data) =>
-          result = Q.resolve(undefined)
+          result = Q.when(undefined)
 
           for action in data
             do (action) =>
@@ -318,7 +318,7 @@ class Commandant.Async extends Commandant
 
           result
         undo: (scope, data) =>
-          result = Q.resolve(undefined)
+          result = Q.when(undefined)
 
           data_rev = data.slice()
           data_rev.reverse()
@@ -338,11 +338,10 @@ class Commandant.Async extends Commandant
 
   silent: (fn) ->
     if @_silent
-      promise = Q.resolve(fn())
+      promise = Q.when(fn())
     else
       @_silent = true
-      promise = Q.resolve(fn())
-      promise.fin =>
+      promise = Q.when(fn()).fin =>
         @_silent = false
 
     promise
@@ -352,7 +351,7 @@ class Commandant.Async extends Commandant
     deferred = Q.defer()
 
     defer_fn = =>
-      Q.resolve(fn.apply(@, args)).then (result) ->
+      Q.when(fn.apply(@, args)).then (result) ->
         deferred.resolve(result)
       , (err) ->
         console.log('Encountered error in deferred fn', err)
@@ -406,7 +405,7 @@ class Commandant.Async extends Commandant
     action = @getRedoActions(true)
     return Q.resolve(undefined) unless action
 
-    Q.resolve(@_run(action, 'run')).then =>
+    Q.when(@_run(action, 'run')).then =>
       @trigger?('redo', action)
       @onRedo?(action)
 
@@ -420,7 +419,7 @@ class Commandant.Async extends Commandant
     action = @getUndoAction(true)
     return Q.resolve(undefined) unless action
 
-    Q.resolve(@_run(action, 'undo')).then =>
+    Q.when(@_run(action, 'undo')).then =>
       @trigger?('undo', action)
       @onUndo?(action)
 
@@ -442,9 +441,9 @@ class Commandant.Async extends Commandant
     @_silent = true
     @_transient = { name }
 
-    Q.resolve(command.init.apply(command, [@scope, args...])).then (data) =>
+    Q.when(command.init.apply(command, [@scope, args...])).then (data) =>
       @_transient.data = data
-      Q.resolve(@_run(@_transient, 'run'))
+      Q.when(@_run(@_transient, 'run'))
     .then (ret_val) =>
       @_transient.ret_val = ret_val
 
@@ -454,7 +453,7 @@ class Commandant.Async extends Commandant
   _updateAsync: (args) ->
     @_assert(@_transient, 'Cannot update without a transient action active.')
 
-    Q.resolve(@_run.apply(@, [@_transient, 'update', args...])).then (data) =>
+    Q.when(@_run.apply(@, [@_transient, 'update', args...])).then (data) =>
       @_transient.data = data
 
   finishTransient: ->
