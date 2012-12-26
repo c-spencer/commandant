@@ -354,6 +354,9 @@ class Commandant.Async extends Commandant
     defer_fn = =>
       Q.resolve(fn.apply(@, args)).then (result) ->
         deferred.resolve(result)
+      , (err) ->
+        console.log('Encountered error in deferred fn', err)
+        deferred.reject(err)
 
     @_deferQueue.push defer_fn
 
@@ -370,12 +373,9 @@ class Commandant.Async extends Commandant
 
     @_running = next_fn()
 
-    @_running.then =>
+    @_running.fin =>
       @_running = null
       @_runDefer()
-    , (err) =>
-      @_running = null
-      console.log("!! deferred function errored", err)
 
     return
 

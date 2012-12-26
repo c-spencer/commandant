@@ -179,6 +179,38 @@ Commandant.silent(fn)
 Runs the given function with no recording of new actions (but still executing).
 ```
 
+## Asynchronous Commands
+
+Commandant can operate in an aynchronous manner, which depends upon the [Q
+promise library](https://github.com/kriskowal/q) (and a version of Commandant
+bundling Q is provided for convenience). To use this mode, use the
+`Commandant.Async` constructor. The API remains the same, and synchronous
+commands will not need modification, however almost all API functions will now
+return promises rather than values. Commands and operations will be run in the
+order they are called.
+
+To implement an Asynchronous Command, simply return a promise from any of the
+command methods (apart from `scope` or `aggregate`).
+
+``` javascript
+keen.execute('ASYNC_COMMAND', 50);
+keen.execute('ASYNC_COMMAND', 100).then(function () {
+  // The two commands have been executed.
+  keen.transient('ASYNC_COMMAND', 20);
+  keen.update(40).then(function () {
+    console.log('Updated to 40.');
+  });
+  keen.update(70);
+  return keen.finishTransient();
+}).then(function () {
+  // The transient command has been executed.
+});
+```
+
+This is still a fresh feature, and the behaviour/sementics around failure are
+still to be decided (whether a failed command causes all queued actions to
+abort, or to just skip that action.)
+
 ## Command Implementation Considerations
 
 When a command is executed, any other executions caused by that execution will
@@ -210,7 +242,7 @@ These are put in place to avoid, and make obvious, possible concurrency issues.
 
 - More examples, particularly an interactive one.
 - More documentation.
-- Asynchronous Commands (based on promises)
+- Consistent/helpful behaviour for asynchronous errors.
 - Action stack synchronisation.
 
 ## License
