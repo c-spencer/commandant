@@ -194,7 +194,7 @@ class Commandant
   # Run the Commandant redos one step. Does nothing if at end of chain.
   redo: ->
     @_assert(!@_transient, 'Cannot redo while transient action active.')
-    @_assert(!@_transient, 'Cannot redo while compound action active.')
+    @_assert(!@_compound, 'Cannot redo while compound action active.')
 
     action = @getRedoActions(true)
     return unless action
@@ -208,7 +208,7 @@ class Commandant
   # Run the Commandant undos one step. Does nothing if at start of chain.
   undo: ->
     @_assert(!@_transient, 'Cannot undo while transient action active.')
-    @_assert(!@_transient, 'Cannot undo while compound action active.')
+    @_assert(!@_compound, 'Cannot undo while compound action active.')
 
     action = @getUndoAction(true)
     return unless action
