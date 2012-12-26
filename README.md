@@ -27,6 +27,8 @@ DocumentCommandant.register('ADD_PARAGRAPH', addParagraphCommand);
 var keen = new DocumentCommandant(my_document);
 ```
 
+There is a simple [scene/canvas demonstration](http://chris-spencer.co.uk/projects/commandant/scene.html). More fleshed out examples to come.
+
 ## Commands
 
 Commandant is centred around the building and application of Commands. Commands are simply JavaScript objects satisfying the following interface:
