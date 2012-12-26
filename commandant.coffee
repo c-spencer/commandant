@@ -69,6 +69,7 @@ class Commandant
 
     @store = new StackStore
 
+    @_silence = false
     @_compound = null
 
   # Allow creation of new Commandants with predefined commands.
@@ -140,15 +141,17 @@ class Commandant
     return
 
   # Execute a function without recording any command executions.
-  silent: (fn) ->
-    if @_silent
+  __silence: (fn) ->
+    if @_silence
       result = fn()
     else
-      @_silent = true
+      @_silence = true
       result = fn()
-      @_silent = false
+      @_silence = false
 
     return result
+
+  silent: Commandant::_silence
 
   # Create a proxy with partially bound arguments.
   # Doesn't support binding for compound command.
@@ -190,7 +193,7 @@ class Commandant
 
     result = @_run(action, 'run')
 
-    if @_silent or !@_agg(action)
+    if @_silence or !@_agg(action)
       @_push(action)
 
     return result
@@ -237,8 +240,6 @@ class Commandant
     @_assert(command.update?,
       "Command #{name} does not support transient calling.")
 
-    @_silent = true
-
     data = command.init.apply(command, [@scope, args...])
     ret_val = @_run({ name, data }, 'run')
 
@@ -258,7 +259,6 @@ class Commandant
     ret_val = @_transient.ret_val
 
     @_transient = null
-    @_silent = false
 
     if !@_agg(action)
       @_push(action)
@@ -271,7 +271,6 @@ class Commandant
     undo = @_run(@_transient, 'undo')
 
     @_transient = null
-    @_silent = false
 
     return undo
 
@@ -305,7 +304,7 @@ class Commandant
   _run: (action, method, args...) ->
     command = @commands[action.name]
     scope = if command.scope then command.scope(@scope, action.data) else @scope
-    @silent(=> command[method].apply(command, [scope, action.data, args...]))
+    @__silence(=> command[method].apply(command, [scope, action.data, args...]))
 
 # Asynchronous version, using the Q promise library.
 class Commandant.Async extends Commandant
@@ -342,15 +341,18 @@ class Commandant.Async extends Commandant
     @_running = null
     @_deferQueue = []
 
-  silent: (fn) ->
-    if @_silent
+  __silence: (fn) ->
+    if @_silence
       promise = Q.when(fn())
     else
-      @_silent = true
+      @_silence = true
       promise = Q.when(fn()).fin =>
-        @_silent = false
+        @_silence = false
 
     promise
+
+  silent: (fn) ->
+    @_defer(@__silence, fn)
 
   # Defer a fn to be run with the Commandant as scope.
   _defer: (fn, args...) ->
@@ -397,7 +399,7 @@ class Commandant.Async extends Commandant
       action = { name, data }
       Q.resolve(@_run(action, 'run'))
     .then (result) =>
-      if @_silent or !@_agg(action)
+      if @_silence or !@_agg(action)
         @_push(action)
       result
 
@@ -447,7 +449,6 @@ class Commandant.Async extends Commandant
     @_assert(command.update?,
       "Command #{name} does not support transient calling.")
 
-    @_silent = true
     @_transient = { name }
 
     Q.when(command.init.apply(command, [@scope, args...])).then (data) =>
