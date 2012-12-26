@@ -17,6 +17,7 @@ SceneCommandant.register('POINT_ADD', {
     var point = canvas.points[data.id];
     point.x = x;
     point.y = y;
+    return point;
   },
 
   run: function (canvas, data) {
@@ -56,6 +57,7 @@ SceneCommandant.register('POINT_MOVE_TO', {
   update: function (point, data, x, y) {
     data.after = { x: x, y: y };
     this.run(point, data);
+    return data;
   },
 
   run: function (point, data) {
@@ -85,6 +87,7 @@ SceneCommandant.register('POINT_MOVE', {
     point.y += dy - data.dy;
     data.dx = dx;
     data.dy = dy;
+    return data;
   },
 
   run: function (point, data) {
@@ -110,37 +113,37 @@ var point_1 = keen.execute('POINT_ADD', 50, 50);
 keen.execute('POINT_MOVE_TO', point_1, 100, 100);
 
 // Can step through the commands executed previously.
-keen.backward();
-keen.forward();
+keen.undo();
+keen.redo();
 
 // Can bind our Commandant to certain arguments.
 var keen_point = keen.bind(point_1);
 keen_point.execute('POINT_MOVE_TO', 60, 70);
 
 // Transients allow you to change the data while recording the action.
-var relative_drag = keen.transient('POINT_MOVE', point_1);
-relative_drag.update(10, 10);
-relative_drag.update(20, 20);
-relative_drag.update(30, 30);
-relative_drag.update(40, 40);
-relative_drag.cancel();
+keen.transient('POINT_MOVE', point_1);
+keen.update(10, 10);
+keen.update(20, 20);
+keen.update(30, 30);
+keen.update(40, 40);
+keen.cancelTransient();
 
 // Can use bound with transients too.
-var drag = keen_point.transient('POINT_MOVE_TO');
-drag.update(60, 80);
-drag.update(50, 60);
-drag.finish();
+keen_point.transient('POINT_MOVE_TO');
+keen.update(60, 80);
+keen.update(50, 60);
+keen.finishTransient();
 
 // The compound command is a transient helper which lets you group multiple
 // other commands into a single step.
-var compound = keen.compound();
-compound.update('POINT_ADD', 11, 11);
-compound.update('POINT_ADD', 22, 22);
-compound.update('POINT_ADD', 33, 33);
-compound.finish();
+keen.captureCompound();
+keen.execute('POINT_ADD', 11, 11);
+keen.execute('POINT_ADD', 22, 22);
+keen.execute('POINT_ADD', 33, 33);
+keen.finishCompound();
 
 console.log(JSON.stringify(my_scene));
-keen.backward();
+keen.undo();
 console.log(JSON.stringify(my_scene));
-keen.forward();
+keen.redo();
 console.log(JSON.stringify(my_scene));
