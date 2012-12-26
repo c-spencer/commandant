@@ -240,6 +240,8 @@ class Commandant
 
     @_transient = { name, data, ret_val }
 
+    @_hook('Update', @_transient)
+
     return
 
   update: (args...) ->
@@ -461,6 +463,10 @@ class Commandant.Async extends Commandant
       Q.when(@_run(@_transient, 'run'))
     .then (ret_val) =>
       @_transient.ret_val = ret_val
+
+      @_hook('Update', @_transient)
+
+      return
 
   update: (args...) ->
     @_defer(@_updateAsync, args)

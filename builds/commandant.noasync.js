@@ -290,6 +290,7 @@
         data: data,
         ret_val: ret_val
       };
+      this._hook('Update', this._transient);
     };
 
     Commandant.prototype.update = function() {

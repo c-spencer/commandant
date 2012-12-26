@@ -290,6 +290,7 @@
         data: data,
         ret_val: ret_val
       };
+      this._hook('Update', this._transient);
     };
 
     Commandant.prototype.update = function() {
@@ -573,7 +574,8 @@
         _this._transient.data = data;
         return Q.when(_this._run(_this._transient, 'run'));
       }).then(function(ret_val) {
-        return _this._transient.ret_val = ret_val;
+        _this._transient.ret_val = ret_val;
+        _this._hook('Update', _this._transient);
       });
     };
 
