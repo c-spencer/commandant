@@ -399,13 +399,11 @@
       var args, deferred, fn, method,
         _this = this;
       method = arguments[0], args = 2 <= arguments.length ? __slice.call(arguments, 1) : [];
-      console.log('_defer', method, args);
       deferred = Q.defer();
       fn = function() {
         var result_promise;
         result_promise = Q.resolve(_this[method].apply(_this, args));
         return result_promise.then(function(result) {
-          console.log('resolving', method, args);
           return deferred.resolve(result);
         });
       };
@@ -443,7 +441,6 @@
     Async.prototype._executeAsync = function(name, args) {
       var command, data_promise, deferred,
         _this = this;
-      console.log('execute Async', name, args);
       command = this.commands[name];
       deferred = Q.defer();
       data_promise = Q.resolve(command.init.apply(command, [this.scope].concat(__slice.call(args))));

@@ -298,14 +298,12 @@ class Commandant.Async extends Commandant
 
   # Defer a method on the Commandant to be run later.
   _defer: (method, args...) ->
-    console.log '_defer', method, args
     deferred = Q.defer()
 
     fn = =>
       result_promise = Q.resolve(@[method].apply(@, args))
 
       result_promise.then (result) ->
-        console.log 'resolving', method, args
         deferred.resolve(result)
 
     @_deferQueue.push fn
@@ -337,8 +335,6 @@ class Commandant.Async extends Commandant
     @_defer('_executeAsync', name, args)
 
   _executeAsync: (name, args) ->
-    console.log 'execute Async', name, args
-
     command = @commands[name]
 
     deferred = Q.defer()
