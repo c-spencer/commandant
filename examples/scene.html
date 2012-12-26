@@ -1,78 +1,97 @@
-<script src="../builds/commandant.noasync.js"></script>
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Commandant Canvas Example</title>
+    <script src="../builds/commandant.noasync.js"></script>
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      canvas {
+        border-right: 1px solid black;
+        border-bottom: 1px solid black;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas" width="500" height="500"></canvas><br/>
+    <button id="undo">Undo</button> <button id="redo">Redo</button>
 
-<button id="undo">Undo</button> <button id="redo">Redo</button><br/>
-<canvas id="canvas" width="500" height="500" style="border:1px solid black; cursor: default"></canvas>
+    <script>
+    // Setup a specialised Commander constructor
+    var SceneCommandant = Commandant.define();
 
-<script>
-// Setup a specialised Commander constructor
-var SceneCommandant = Commandant.define();
+    // Register default actions
+    SceneCommandant.register('POINT_ADD', {
+      init: function (canvas, x, y) {
+        return {
+          id: ++canvas.id_counter,
+          x: x,
+          y: y
+        };
+      },
 
-// Register default actions
-SceneCommandant.register('POINT_ADD', {
-  init: function (canvas, x, y) {
-    return {
-      id: ++canvas.id_counter,
-      x: x,
-      y: y
-    };
-  },
+      // Allow position to be changed while creating.
+      update: function (canvas, data, x, y) {
+        var point = canvas.points[data.id];
+        point.x = x;
+        point.y = y;
+        return point;
+      },
 
-  // Allow position to be changed while creating.
-  update: function (canvas, data, x, y) {
-    var point = canvas.points[data.id];
-    point.x = x;
-    point.y = y;
-    return point;
-  },
+      run: function (canvas, data) {
+        var point = canvas.points[data.id] = { id: data.id, x: data.x, y: data.y };
+        return point;
+      },
 
-  run: function (canvas, data) {
-    var point = canvas.points[data.id] = { id: data.id, x: data.x, y: data.y };
-    return point;
-  },
+      undo: function (canvas, data) {
+        delete canvas.points[data.id];
+      }
+    });
 
-  undo: function (canvas, data) {
-    delete canvas.points[data.id];
-  }
-});
+    // Setup scene
+    var my_scene = {points: {}, id_counter: 0};
 
-// Setup scene
-var my_scene = {points: {}, id_counter: 0};
+    var canvas = document.getElementById('canvas');
+    var ctx = canvas.getContext('2d');
 
-var canvas = document.getElementById('canvas');
-var ctx = canvas.getContext('2d');
+    // Render function
+    function render() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-// Render function
-function render() {
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (var point_idx in my_scene.points) {
+        var point = my_scene.points[point_idx];
+        ctx.fillRect(point.x - 5, point.y - 5, 10, 10);
+      }
+    }
 
-  for (var point_idx in my_scene.points) {
-    var point = my_scene.points[point_idx];
-    ctx.fillRect(point.x - 5, point.y - 5, 10, 10);
-  }
-}
+    // Create our Commandant
+    var keen = new SceneCommandant(my_scene);
 
-// Create our Commandant
-var keen = new SceneCommandant(my_scene);
+    keen.onChange = render;
 
-keen.onChange = render;
+    document.getElementById('undo').onclick = keen.undo.bind(keen);
+    document.getElementById('redo').onclick = keen.redo.bind(keen);
+    document.onselectstart = function(){ return false; }
 
-document.getElementById('undo').onclick = keen.undo.bind(keen);
-document.getElementById('redo').onclick = keen.redo.bind(keen);
-document.onselectstart = function(){ return false; }
+    var newpoint = false;
 
-var newpoint = false;
+    canvas.onmousedown = function (e) {
+      keen.transient('POINT_ADD', e.pageX, e.pageY);
+      newpoint = true;
+    }
+    canvas.onmousemove = function (e) {
+      if (newpoint) {
+        keen.update(e.pageX, e.pageY);
+      }
+    }
+    canvas.onmouseup = function (e) {
+      keen.finishTransient();
+      newpoint = false;
+    }
+    </script>
 
-canvas.onmousedown = function (e) {
-  keen.transient('POINT_ADD', e.offsetX, e.offsetY);
-  newpoint = true;
-}
-canvas.onmousemove = function (e) {
-  if (newpoint) {
-    keen.update(e.offsetX, e.offsetY);
-  }
-}
-canvas.onmouseup = function (e) {
-  keen.finishTransient();
-  newpoint = false;
-}
-</script>
+  </body>
+</html>
+
