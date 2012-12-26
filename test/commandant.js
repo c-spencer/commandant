@@ -161,7 +161,7 @@ exports['Basic Commandant'] = {
 
     var counters = { init: 0, run: 0, undo: 0, scope: 0, update: 0, aggregate: 0 };
 
-    test.expect(14);
+    test.expect(17);
 
     keen.register('ASYNC_COMMAND', {
       init: function (scope, arg) {
@@ -238,6 +238,15 @@ exports['Basic Commandant'] = {
 
     keen.redo().then(function () {
       test.equal(test_target.data, 160);
+    });
+
+    // Test chained syntax
+    keen.execute('ASYNC_COMMAND', 10).then(function (data) {
+      test.equal(test_target.data, 180);
+      test.equal(data, 180);
+      return keen.execute('ASYNC_COMMAND', 10);
+    }).then(function () {
+      test.equal(test_target.data, 200);
       test.done();
     });
 
