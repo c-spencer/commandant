@@ -11,17 +11,17 @@ module.exports = function (grunt) {
     concat: {
       dist: {
         src: ['./node_modules/q/q.js', './commandant.js'],
-        dest: './commandant.q.js'
+        dest: './builds/commandant.q.js'
       }
     },
     min: {
       dist: {
-        src: ['./commandant.js'],
-        dest: './commandant.min.js'
+        src: ['./builds/commandant.js'],
+        dest: './builds/commandant.min.js'
       },
       dist_q: {
-        src: ['./commandant.q.js'],
-        dest: './commandant.q.min.js'
+        src: ['./builds/commandant.q.js'],
+        dest: './builds/commandant.q.min.js'
       }
     },
     uglify: {
@@ -32,7 +32,7 @@ module.exports = function (grunt) {
     coffee: {
       app: {
         src: ['commandant.coffee'],
-        dest: './',
+        dest: './builds/',
         options: {
           bare: false
         }
