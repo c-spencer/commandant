@@ -1,7 +1,11 @@
+`// @exclude
+`
 if typeof require != 'undefined'
   try
     Q = require('q')
   catch exc
+`// @endexclude
+`
 
 
 # Store for a linear series of actions.
@@ -306,6 +310,8 @@ class Commandant
     scope = if command.scope then command.scope(@scope, action.data) else @scope
     @__silence(=> command[method].apply(command, [scope, action.data, args...]))
 
+`// @exclude
+`
 # Asynchronous version, using the Q promise library.
 class Commandant.Async extends Commandant
 
@@ -471,6 +477,9 @@ class Commandant.Async extends Commandant
 
   cancelTransient: ->
     @_defer(Commandant::cancelTransient)
+
+`// @endexclude
+`
 
 if typeof module != 'undefined'
   module.exports = Commandant

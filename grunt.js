@@ -1,7 +1,14 @@
 module.exports = function (grunt) {
   grunt.loadNpmTasks('grunt-coffee');
+  grunt.loadNpmTasks('grunt-preprocess');
 
   grunt.initConfig({
+    preprocess: {
+      js: {
+        src: './builds/commandant.js',
+        dest: './builds/commandant.noasync.js'
+      }
+    },
     lint: {
       all: ['grunt.js', './examples/scene.js', './test/*.js']
     },
@@ -10,7 +17,7 @@ module.exports = function (grunt) {
     },
     concat: {
       dist: {
-        src: ['./node_modules/q/q.js', './commandant.js'],
+        src: ['./node_modules/q/q.js', './builds/commandant.js'],
         dest: './builds/commandant.q.js'
       }
     },
@@ -22,6 +29,10 @@ module.exports = function (grunt) {
       dist_q: {
         src: ['./builds/commandant.q.js'],
         dest: './builds/commandant.q.min.js'
+      },
+      dist_noasync: {
+        src: ['./builds/commandant.noasync.js'],
+        dest: './builds/commandant.noasync.min.js'
       }
     },
     uglify: {
@@ -34,11 +45,12 @@ module.exports = function (grunt) {
         src: ['commandant.coffee'],
         dest: './builds/',
         options: {
-          bare: false
+          bare: false,
+          comments: true
         }
       }
     }
   });
 
-  grunt.registerTask('default', 'coffee lint test concat min');
+  grunt.registerTask('default', 'coffee lint test concat preprocess min');
 };
