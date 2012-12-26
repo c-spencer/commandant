@@ -124,6 +124,10 @@ exports['Basic Commandant'] = {
     test.deepEqual(keen.storeStats(), { length: 1, position: 1 });
     test.deepEqual(counters, { init: 5, run: 7, undo: 4, scope: 13, update: 2, aggregate: 3 });
 
+    keen.reset(false);
+    test.deepEqual(keen.storeStats(), { length: 0, position: 0 });
+    test.deepEqual(counters, { init: 5, run: 7, undo: 4, scope: 13, update: 2, aggregate: 3 });
+
     test.done();
   },
   'async operations': function (test) {
