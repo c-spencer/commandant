@@ -1825,7 +1825,7 @@ var qEndingLine = captureLine();
     Commandant.prototype.redo = function() {
       var action;
       this._assert(!this._transient, 'Cannot redo while transient action active.');
-      this._assert(!this._transient, 'Cannot redo while compound action active.');
+      this._assert(!this._compound, 'Cannot redo while compound action active.');
       action = this.getRedoActions(true);
       if (!action) {
         return;
@@ -1842,7 +1842,7 @@ var qEndingLine = captureLine();
     Commandant.prototype.undo = function() {
       var action;
       this._assert(!this._transient, 'Cannot undo while transient action active.');
-      this._assert(!this._transient, 'Cannot undo while compound action active.');
+      this._assert(!this._compound, 'Cannot undo while compound action active.');
       action = this.getUndoAction(true);
       if (!action) {
         return;
