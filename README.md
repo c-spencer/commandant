@@ -226,9 +226,6 @@ generated. If you generate the id inside `init` and then use that, then you have
 a stable reference to where the object is. `scope` particularly is useful for
 hiding this detail when modifying objects (though not when creating).
 
-For a concrete example of an implementation satisfying these constraints, see
-`examples/scene.js`.
-
 ### Concurrency
 
 When implementing commands, Commandant tries to provide safety through how its

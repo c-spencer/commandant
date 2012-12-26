@@ -1,0 +1,78 @@
+<script src="../builds/commandant.noasync.js"></script>
+
+<button id="undo">Undo</button> <button id="redo">Redo</button><br/>
+<canvas id="canvas" width="500" height="500" style="border:1px solid black; cursor: default"></canvas>
+
+<script>
+// Setup a specialised Commander constructor
+var SceneCommandant = Commandant.define();
+
+// Register default actions
+SceneCommandant.register('POINT_ADD', {
+  init: function (canvas, x, y) {
+    return {
+      id: ++canvas.id_counter,
+      x: x,
+      y: y
+    };
+  },
+
+  // Allow position to be changed while creating.
+  update: function (canvas, data, x, y) {
+    var point = canvas.points[data.id];
+    point.x = x;
+    point.y = y;
+    return point;
+  },
+
+  run: function (canvas, data) {
+    var point = canvas.points[data.id] = { id: data.id, x: data.x, y: data.y };
+    return point;
+  },
+
+  undo: function (canvas, data) {
+    delete canvas.points[data.id];
+  }
+});
+
+// Setup scene
+var my_scene = {points: {}, id_counter: 0};
+
+var canvas = document.getElementById('canvas');
+var ctx = canvas.getContext('2d');
+
+// Render function
+function render() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  for (var point_idx in my_scene.points) {
+    var point = my_scene.points[point_idx];
+    ctx.fillRect(point.x - 5, point.y - 5, 10, 10);
+  }
+}
+
+// Create our Commandant
+var keen = new SceneCommandant(my_scene);
+
+keen.onChange = render;
+
+document.getElementById('undo').onclick = keen.undo.bind(keen);
+document.getElementById('redo').onclick = keen.redo.bind(keen);
+document.onselectstart = function(){ return false; }
+
+var newpoint = false;
+
+canvas.onmousedown = function (e) {
+  keen.transient('POINT_ADD', e.offsetX, e.offsetY);
+  newpoint = true;
+}
+canvas.onmousemove = function (e) {
+  if (newpoint) {
+    keen.update(e.offsetX, e.offsetY);
+  }
+}
+canvas.onmouseup = function (e) {
+  keen.finishTransient();
+  newpoint = false;
+}
+</script>
