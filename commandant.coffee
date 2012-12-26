@@ -289,6 +289,12 @@ class Commandant
     @_push({ name: '__compound', data: cmds })
     return
 
+  cancelCompound: ->
+    @_assert(@_compound, 'Cannot cancelCompound without compound capture active.')
+    result = @commands['__compound'].undo(@scope, @_compound)
+    @_compound = null
+    return result
+
   # Private helpers
   _assert: (val, message) ->
     if @opts.pedantic and !val
@@ -428,6 +434,9 @@ class Commandant.Async extends Commandant
 
   finishCompound: ->
     @_defer(Commandant::finishCompound)
+
+  cancelCompound: ->
+    @_defer(Commandant::cancelCompound)
 
   transient: (name, args...) ->
     @_defer(@_transientAsync, name, args)

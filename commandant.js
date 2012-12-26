@@ -359,6 +359,14 @@
       });
     };
 
+    Commandant.prototype.cancelCompound = function() {
+      var result;
+      this._assert(this._compound, 'Cannot cancelCompound without compound capture active.');
+      result = this.commands['__compound'].undo(this.scope, this._compound);
+      this._compound = null;
+      return result;
+    };
+
     Commandant.prototype._assert = function(val, message) {
       if (this.opts.pedantic && !val) {
         throw message;
@@ -550,6 +558,10 @@
 
     Async.prototype.finishCompound = function() {
       return this._defer(Commandant.prototype.finishCompound);
+    };
+
+    Async.prototype.cancelCompound = function() {
+      return this._defer(Commandant.prototype.cancelCompound);
     };
 
     Async.prototype.transient = function() {

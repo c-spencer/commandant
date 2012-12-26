@@ -153,6 +153,15 @@ exports['Basic Commandant'] = {
     keen.finishCompound();
     test.deepEqual(counters, { init: 10, run: 15, undo: 7, scope: 25, update: 3, aggregate: 5 });
 
+    test.deepEqual(keen.storeStats(), { length: 3, position: 3 });
+    keen.captureCompound();
+    keen.execute('TEST_COMMAND', 1, 2);
+    keen.execute('TEST_COMMAND', 2, 3);
+    keen.execute('TEST_COMMAND', 3, 4);
+    keen.cancelCompound();
+    test.deepEqual(keen.storeStats(), { length: 3, position: 3 });
+    test.deepEqual(counters, { init: 13, run: 18, undo: 10, scope: 31, update: 3, aggregate: 7 });
+
     test.done();
   },
   'async operations': function (test) {
@@ -161,7 +170,7 @@ exports['Basic Commandant'] = {
 
     var counters = { init: 0, run: 0, undo: 0, scope: 0, update: 0, aggregate: 0 };
 
-    test.expect(20);
+    test.expect(21);
 
     keen.register('ASYNC_COMMAND', {
       init: function (scope, arg) {
@@ -191,9 +200,8 @@ exports['Basic Commandant'] = {
         return deferred.promise;
       },
       update: function (scope, prev, data) {
-        scope.data -= prev + 10;
-        scope.data += data + 10;
-        return data;
+        return Q.all([this.undo(scope, prev), this.run(scope, data)])
+                .then(function () { return data; });
       },
       undo: function (scope, data) {
         ++counters.undo;
@@ -265,6 +273,13 @@ exports['Basic Commandant'] = {
     }).then(function () {
       test.equal(test_target.data, 200);
       return keen.redo();
+    }).then(function () {
+      test.equal(test_target.data, 250);
+    }).then(function () {
+      keen.captureCompound();
+      keen.execute('ASYNC_COMMAND', 10);
+      keen.execute('ASYNC_COMMAND', 20);
+      return keen.cancelCompound();
     }).then(function () {
       test.equal(test_target.data, 250);
       test.done();
